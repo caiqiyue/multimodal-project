@@ -349,3 +349,4 @@ MIT — 详见 [LICENSE](LICENSE)。
 - **LangGraph / LangChain** — Agent 编排
 - **FastAPI** + **PostgreSQL** + **Nginx** — 后端生态
 - **React Native** + **Expo** + **Taro** — 客户端框架
+<!-- Sync chain test: 2026-08-23T13:49:46Z | commit abb0301+1 | local->github->server pull verified -->
