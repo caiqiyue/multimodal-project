@@ -389,3 +389,36 @@ server-deploy-key*
 !requirements.txt
 !docs/项目总执行计划.md
 !docs/服务器运维手册.md
+
+# ============================================================
+# 第十九优先级：pnpm monorepo / TS / Expo / Taro / MSW（Task 1.2）
+# ============================================================
+
+# pnpm monorepo
+node_modules/
+.pnpm-store/
+
+# TypeScript build outputs
+*.tsbuildinfo
+dist/
+build/
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+*.jwk
+*.p8
+*.p12
+*.pem
+
+# Taro
+.taro/
+
+# MSW
+public/mockServiceWorker.js
+src/mocks/browser.js
+
+# Editor
+.vscode/
+.idea/
