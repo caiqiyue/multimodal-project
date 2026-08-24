@@ -1,0 +1,19 @@
+{
+  "name": "multimodal-project",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Multimodal AI Assistant — frontend MVP (Mac local)",
+  "scripts": {
+    "dev:mobile": "pnpm --filter mobile-app dev",
+    "dev:mini": "pnpm --filter mini-program dev:h5",
+    "dev:mini:weapp": "pnpm --filter mini-program dev:weapp",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.32.1"
+}
