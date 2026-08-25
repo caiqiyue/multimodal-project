@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "msw": "^2.6.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -22,5 +23,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "msw": {
+    "workerDirectory": [
+      "public"
+    ]
+  }
 }
