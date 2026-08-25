@@ -1,3 +1,3 @@
-import { healthHandlers } from './health.js';
+import { healthHandlers } from './health';
 
 export const handlers = [...healthHandlers];

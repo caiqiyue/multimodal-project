@@ -1,20 +1,40 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
 
-export default function App() {
+async function enableMocking() {
+  if (!__DEV__) return;
+  // React Native has no Service Worker API, so MSW uses setupServer
+  // (msw/native) with listen() instead of setupWorker + start().
+  const { server } = await import('./src/mocks/server');
+  server.listen();
+}
+
+function HomeScreen() {
+  const [healthStatus, setHealthStatus] = useState<string>('checking...');
+
+  useEffect(() => {
+    import('./src/lib/api').then(({ checkHealth }) => {
+      checkHealth()
+        .then((res) => setHealthStatus(res.status))
+        .catch((err) => setHealthStatus(`error: ${err.message}`));
+    });
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Multimodal Mobile App</Text>
+      <Text>MSW health: {healthStatus}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export default function App() {
+  const [mockingEnabled, setMockingEnabled] = useState(false);
+
+  useEffect(() => {
+    enableMocking().then(() => setMockingEnabled(true));
+  }, []);
+
+  if (!mockingEnabled) return null;
+  return <HomeScreen />;
+}
