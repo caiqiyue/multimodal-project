@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@multimodal/api-contract": "workspace:*",
+    "@multimodal/chat-protocol": "workspace:*",
+    "@multimodal/mock-data": "workspace:*",
     "expo": "~57.0.16",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",

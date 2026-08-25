@@ -10,6 +10,15 @@ importers:
 
   clients/mobile-app:
     dependencies:
+      '@multimodal/api-contract':
+        specifier: workspace:*
+        version: link:../../packages/api-contract
+      '@multimodal/chat-protocol':
+        specifier: workspace:*
+        version: link:../../packages/chat-protocol
+      '@multimodal/mock-data':
+        specifier: workspace:*
+        version: link:../../packages/mock-data
       expo:
         specifier: ~57.0.16
         version: 57.0.16(@babel/core@7.29.7)(@expo/dom-webview@57.0.1)(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
