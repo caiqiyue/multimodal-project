@@ -422,3 +422,8 @@ src/mocks/browser.js
 # Editor
 .vscode/
 .idea/
+
+# 本地权限 / agent 配置 / 临时文件（不入仓）
+.claude/
+截屏*.png
+*.local.png
