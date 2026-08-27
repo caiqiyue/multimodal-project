@@ -327,8 +327,8 @@ data: {"id": "msg_001", "finish_reason": "stop", "usage": {"total_tokens": 156}}
 | feat-105 | 6 | P2 | MSW 框架在两套 client 集成 |
 | feat-110 | 7 | P1/P3 | mobile-app 骨架（Expo + Expo Router + 基础屏） |
 | feat-111 | 8 | P1/P3 | mini-program 骨架（Taro + pages + 基础屏） |
-| feat-120 | 9 | P3 | mobile-app Auth（login + register + token 存储 + refresh 拦截） |
-| feat-121 | 10 | P3 | mini-program Auth（login + register + token 存储 + refresh 拦截） |
+| feat-120 | 9 | P3 | mobile-app Auth（login + token 存储 + cold-start 恢复 + refresh 拦截） |
+| feat-121 | 10 | P3 | mini-program Auth（wx.login + /auth/wechat-mini + token 存储 + cold-start 恢复） |
 | feat-130 | 11 | P4 | mobile-app Chat（Chat 主页 + 流式 + text/image/video content） |
 | feat-131 | 12 | P4 | mini-program Chat（Chat 主页 + 流式 + text/image/video content） |
 | feat-140 | 13 | P5 | mobile-app 周边（会话列表 + media upload + settings + profile） |
@@ -387,3 +387,61 @@ V1（前端 MVP）成功的硬标准：
 - V1 总览：`README.md`（更新为前端优先）
 - 操作手册：`CLAUDE.md`（红线保持）
 - 路线图：`docs/项目总执行计划.md`
+
+---
+
+## 13. Implementation Status
+
+> **Source of truth**: [`feature_list.json`](feature_list.json) 的 `features[]` 数组 + 每行 `status: not_started | in_progress | passing | blocked | skipped`。本节只是人类可读快照。
+
+> **Implementation log**: [`claude-progress.md`](../../claude-progress.md)（append-only session log）+ [`session-handoff.md`](../../session-handoff.md)（长 session 交接卡）。
+
+### 当前状态（截至 2026-08-27，Session 011）
+
+**H_Frontend_MVP（11/16 passing）**：
+
+| ID | 标题 | status | commit |
+|----|------|--------|--------|
+| feat-100 | Mac dev 工具链补齐 | passing | — |
+| feat-101 | pnpm monorepo 初始化 | passing | — |
+| feat-102 | api-contract package | passing | — |
+| feat-103 | chat-protocol package | passing | — |
+| feat-104 | mock-data package | passing | — |
+| feat-105 | MSW 框架双端集成 | passing | — |
+| feat-110 | mobile-app 骨架 | passing | — |
+| feat-111 | mini-program 骨架 | passing | — |
+| feat-120 | mobile-app Auth（mock-first） | passing | f829028 |
+| feat-121 | mini-program Auth（mock-first） | passing | 3c9d731 |
+| feat-130 | mobile-app Chat | not_started | — |
+| feat-131 | mini-program Chat | not_started | — |
+| feat-140 | mobile-app 周边 | not_started | — |
+| feat-141 | mini-program 周边 | not_started | — |
+| feat-150 | README + 切真后端 handoff | not_started | — |
+| feat-V.1 | monorepo verification 套件 | passing | 9ab7de4 |
+
+**D_Agent_Backend / E_Public_API（冻结中）**：
+
+| ID | 标题 | status | 说明 |
+|----|------|--------|------|
+| feat-016 | FastAPI 骨架 | not_started | 留给用户 SSH 进 paper3-server 做；Mac 本地 session 不连服务器 |
+| feat-021 | WebSocket 聊天 | not_started | 同上 |
+| feat-026 | JWT auth（login / refresh / wechat-mini） | not_started | 同上；前端 `authFetch()` 已留 401 TODO 钩子 |
+
+### 与本 spec §8.2 的差异（design vs reality）
+
+| ID | spec 写 | 实际落地 | 原因 |
+|----|--------|----------|------|
+| feat-120 | "login + register + token 存储 + refresh 拦截" | login + token 存储 + cold-start 恢复 + refresh 拦截（仅 401 TODO 钩子） | Session 010 mock-first；register 留待 feat-026 真后端 |
+| feat-121 | "login + register + token 存储 + refresh 拦截" | wx.login + /auth/wechat-mini + token 存储 + cold-start 恢复（仅 401 TODO 钩子） | Session 011 mock-first；register 留待 feat-026 真后端；刷新拦截同上 |
+
+> **核心 mock-first 决策**：两个 client 的 Auth 都是 mock-first；register / 真 refresh interceptor / 真后端交换 = 等 feat-026 + feat-037 就位后再做。决策依据见 [docs/2026-08-27-frontend-next-step-decision.md](../../2026-08-27-frontend-next-step-decision.md)。
+
+### 关键边界（每次 session 末都要重读）
+
+- WIP=1：不混跑前端 + 服务器训练主线
+- 不 scp/rsync 任何代码（CLAUDE.md §1 红线）
+- 客户端不持有 secret（vLLM key / DB 密码 / 微信 AppSecret）
+- 不切真后端直到 feat-026 + feat-037 同时就位
+- mock `/auth/wechat-mini` 任何非空 code 都返回 alice（user_001）tokens；这是 mock 层短路的"占位"，不是真 wx.login 行为
+- Node ESM 25+ 不自动 `.js → .ts` 改写：`packages/*/src/index.ts` 必须显式 `.ts` 扩展（Session 011 fix）
+- Taro 4 page 文件必须 `default export`（Expo/Metro 允许 named export，两者约定不同）
