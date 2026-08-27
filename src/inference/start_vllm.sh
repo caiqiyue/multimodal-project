@@ -100,6 +100,12 @@ echo "  pid file:     $PID_FILE"
 # those workloads are not running.
 # `--limit-mm-per-prompt` is parsed by ast.literal_eval, so the value must be
 # a Python dict literal: {"image": 2, "video": 1}. Not "image=2,video=1".
+# `--enable-auto-tool-choice` + `--tool-call-parser hermes` (feat-018) —
+# vLLM's auto tool choice emits `<tool_call>...</tool_call>` blocks parsed by
+# the hermes parser, matching Qwen3-VL's chat template. Without these flags,
+# vLLM ignores the `tools=` payload from the OpenAI-compatible client and
+# ChatOpenAI.bind_tools() is a silent no-op. Hermes is the documented parser
+# for Qwen-family tool calls.
 nohup python -m vllm.entrypoints.openai.api_server \
   --model "$MODEL_PATH" \
   --served-model-name vlm-base \
@@ -109,6 +115,8 @@ nohup python -m vllm.entrypoints.openai.api_server \
   --max-model-len 8192 \
   --gpu-memory-utilization 0.5 \
   --limit-mm-per-prompt '{"image": 2, "video": 1}' \
+  --enable-auto-tool-choice \
+  --tool-call-parser hermes \
   > "$LOG_FILE" 2>&1 &
 
 PID=$!
