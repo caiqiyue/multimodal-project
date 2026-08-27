@@ -18,6 +18,8 @@
     "jsx": "react-jsx",
     "allowJs": true,
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "typeRoots": [
       "node_modules/@types"
     ],

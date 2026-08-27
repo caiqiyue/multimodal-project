@@ -1,5 +1,8 @@
-import { LoginRequestSchema } from '@multimodal/api-contract';
-import { mockLogin } from '@multimodal/mock-data';
+import {
+  LoginRequestSchema,
+  WechatMiniRequestSchema,
+} from '@multimodal/api-contract';
+import { mockLogin, mockWechatMini } from '@multimodal/mock-data';
 
 // Mock API for @tarojs/plugin-mock (weapp target).
 // During `taro build --type weapp --watch`, the plugin starts an Express server
@@ -33,6 +36,20 @@ function handleLogin(req: SidecarRequest, res: SidecarResponse): void {
   res.json(result.response);
 }
 
+function handleWechatMini(req: SidecarRequest, res: SidecarResponse): void {
+  const parsed = WechatMiniRequestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_code' });
+    return;
+  }
+  const result = mockWechatMini(parsed.data.code);
+  if (!result.ok) {
+    res.status(400).json({ error: result.error });
+    return;
+  }
+  res.json(result.response);
+}
+
 export default {
   'GET /health': {
     status: 'ok',
@@ -40,4 +57,5 @@ export default {
     timestamp: Date.now(),
   },
   'POST /auth/login': handleLogin,
+  'POST /auth/wechat-mini': handleWechatMini,
 };

@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { UserSchema } from './auth.js';
+import { UserSchema } from './auth.ts';
 
 export { UserSchema };
-export type { User } from './auth.js';
+export type { User } from './auth.ts';
 
 export const UpdateUserRequestSchema = UserSchema.pick({
   display_name: true,

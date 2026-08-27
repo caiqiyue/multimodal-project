@@ -1,5 +1,5 @@
 import type { LoginResponse } from '@multimodal/api-contract';
-import { findUserByUsername } from './users';
+import { findUserById, findUserByUsername } from './users.ts';
 
 export type MockLoginError = 'invalid_request' | 'invalid_credentials';
 
@@ -32,6 +32,57 @@ export function mockLogin(
   const user = findUserByUsername(username);
   if (user === undefined || user.password !== password) {
     return { ok: false, error: 'invalid_credentials' };
+  }
+  const ts = Date.now();
+  const responseUser: LoginResponse['user'] = {
+    id: user.id,
+    username: user.username,
+    display_name: user.display_name,
+    ...(user.avatar_url !== undefined ? { avatar_url: user.avatar_url } : {}),
+  };
+  return {
+    ok: true,
+    response: {
+      access_token: `mock-access-${user.id}-${ts}`,
+      refresh_token: `mock-refresh-${user.id}-${ts}`,
+      user: responseUser,
+    },
+  };
+}
+
+// ===== WeChat Mini Program (feat-121) =====
+//
+// Real WeChat code exchange (feat-026 + feat-037) goes:
+//   client Taro.login() -> wx code -> POST /auth/wechat-mini -> server
+//     validates code via WeChat API -> creates/looks up user -> tokens
+//
+// The mock layer short-circuits the WeChat API call: any non-empty code
+// resolves to a deterministic demo user so the UI can land somewhere. This
+// keeps the H5 msw/browser and weapp tarojs-plugin-mock sidecar in sync
+// without an external dependency.
+
+export type MockWechatMiniError = 'invalid_code';
+
+export type MockWechatMiniResult =
+  | { ok: true; response: LoginResponse }
+  | { ok: false; error: MockWechatMiniError };
+
+/**
+ * Resolve a mock WeChat-mini login attempt. Returns LoginResponse (same
+ * shape as mockLogin) for any non-empty code, otherwise invalid_code.
+ *
+ * Always resolves to alice (user_001) — the same default the mobile-app
+ * LoginScreen form reaches after a successful username/password exchange.
+ */
+export function mockWechatMini(code: unknown): MockWechatMiniResult {
+  if (typeof code !== 'string' || code.length === 0) {
+    return { ok: false, error: 'invalid_code' };
+  }
+  const user = findUserById('user_001');
+  if (user === undefined) {
+    // user_001 is part of TEST_USERS and cannot be missing; this guards the
+    // type narrowing so callers get a fully-shaped LoginResponse['user'].
+    return { ok: false, error: 'invalid_code' };
   }
   const ts = Date.now();
   const responseUser: LoginResponse['user'] = {
