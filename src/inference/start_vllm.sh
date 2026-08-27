@@ -86,7 +86,8 @@ echo "  pid file:     $PID_FILE"
 # `--trust-remote-code` is required for Qwen3-VL's custom model code.
 # `--max-model-len 8192` is plenty for V1 chat (Qwen3-VL default is 40960).
 # `--gpu-memory-utilization 0.85` leaves headroom for KV cache growth.
-# `--limit-mm-per-prompt image=2,video=1` keeps VRAM predictable for video test.
+# `--limit-mm-per-prompt` is parsed by ast.literal_eval, so the value must be
+# a Python dict literal: {"image": 2, "video": 1}. Not "image=2,video=1".
 nohup python -m vllm.entrypoints.openai.api_server \
   --model "$MODEL_PATH" \
   --served-model-name vlm-base \
@@ -95,7 +96,7 @@ nohup python -m vllm.entrypoints.openai.api_server \
   --trust-remote-code \
   --max-model-len 8192 \
   --gpu-memory-utilization 0.85 \
-  --limit-mm-per-prompt image=2,video=1 \
+  --limit-mm-per-prompt '{"image": 2, "video": 1}' \
   > "$LOG_FILE" 2>&1 &
 
 PID=$!
