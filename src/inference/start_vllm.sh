@@ -23,6 +23,19 @@
 
 set -e
 
+# Activate conda env (start_vllm.sh may run outside an activated shell —
+# e.g. via systemd, cron, or simply `bash start_vllm.sh` from $HOME).
+if ! command -v python &> /dev/null; then
+  if [ -f /opt/miniconda3/etc/profile.d/conda.sh ]; then
+    # shellcheck disable=SC1091
+    source /opt/miniconda3/etc/profile.d/conda.sh
+    conda activate multimodal_ai
+  else
+    echo "FAIL: python not in PATH and /opt/miniconda3 not found"
+    exit 1
+  fi
+fi
+
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MODEL_PATH="${MODEL_PATH:-/mnt/public/caiqiyue_file/multimodal-project/models/Qwen3-VL-2B-Instruct}"
 LOG_FILE="${LOG_FILE:-/tmp/vllm-feat-002.log}"
