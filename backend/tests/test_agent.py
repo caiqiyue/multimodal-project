@@ -23,6 +23,7 @@ from langgraph.graph import END, START, StateGraph
 
 from backend.app.agent.graph import AgentState
 from backend.app.main import app
+from backend.app.schemas.agent import ChatMessage
 import backend.app.agent.graph as graph_module
 
 
@@ -170,9 +171,9 @@ def test_agent_module_imports_clean():
 
     # Build a throwaway graph and confirm LangChain message classes coerce.
     msgs = _to_langchain([
-        {"role": "user", "content": "hi"},
-        {"role": "assistant", "content": "yo"},
-        {"role": "system", "content": "be brief"},
+        ChatMessage(role="user", content="hi"),
+        ChatMessage(role="assistant", content="yo"),
+        ChatMessage(role="system", content="be brief"),
     ])
     assert isinstance(msgs[0], HumanMessage)
     assert isinstance(msgs[1], AIMessage)

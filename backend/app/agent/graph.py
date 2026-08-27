@@ -12,11 +12,13 @@ Reference: docs/项目总执行计划.md §21 + §22.
 from __future__ import annotations
 
 import logging
-from typing import TypedDict
+from typing import Annotated
 
 from langchain_core.messages import BaseMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from typing_extensions import TypedDict
 
 from backend.app.core.config import get_settings
 
@@ -27,11 +29,14 @@ logger = logging.getLogger(__name__)
 class AgentState(TypedDict, total=False):
     """Conversation state passed between graph nodes.
 
-    V1 only carries `messages`. A future reducer (`add_messages` from langgraph)
-    would let nodes append without overwriting — kept out of V1 to stay minimal.
+    `messages` carries the standard langgraph `add_messages` reducer — when a
+    node returns `{"messages": [new_msg]}`, langgraph appends it to the
+    existing list instead of replacing the whole list. Without the reducer
+    the assistant's reply would overwrite the user's input and `result["messages"]`
+    would only contain the assistant turn.
     """
 
-    messages: list[BaseMessage]
+    messages: Annotated[list[BaseMessage], add_messages]
 
 
 def _build_llm() -> ChatOpenAI:
