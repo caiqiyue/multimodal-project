@@ -1,0 +1,1 @@
+# Multimodal AI Assistant — backend package

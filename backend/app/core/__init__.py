@@ -1,0 +1,1 @@
+# backend.app.core — config, security, dependency singletons
