@@ -12,6 +12,14 @@ import {
 
 async function enableMocking() {
   if (!__DEV__) return;
+  // EXPO_PUBLIC_API_BASE_URL flips the app between mock and real backend.
+  // Empty (or unset) → MSW intercepts everything (mock-first dev).
+  // Non-empty (e.g. http://127.0.0.1:9000/api/v1) → MSW is skipped, real
+  // backend is hit directly. Path prefix (e.g. /api/v1) is included in
+  // the env var so call sites stay path-only.
+  if ((process.env.EXPO_PUBLIC_API_BASE_URL ?? '').length > 0) {
+    return;
+  }
   // React Native has no Service Worker API, so MSW uses setupServer
   // (msw/native) with listen() instead of setupWorker + start().
   const { server } = await import('./src/mocks/server');
