@@ -46,6 +46,14 @@ PORT="${PORT:-8000}"
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-1}"
 
+# System libstdc++ (6.0.30) lacks CXXABI_1.3.15+ that vLLM/PyTorch were
+# linked against. Conda env ships its own libstdc++.so.6.0.35 — prepend
+# its lib dir so its symbols are resolved first.
+CONDA_LIB="${CONDA_PREFIX:-/opt/miniconda3/envs/multimodal_ai}/lib"
+if [ -d "$CONDA_LIB" ]; then
+  export LD_LIBRARY_PATH="$CONDA_LIB:${LD_LIBRARY_PATH:-}"
+fi
+
 # Best-effort kill of any prior vLLM on this port.
 if OLD_PID="$(fuser "${PORT}/tcp" 2>/dev/null)" && [ -n "$OLD_PID" ]; then
   echo "killing prior vLLM pid(s) on :$PORT: $OLD_PID"
