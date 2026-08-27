@@ -49,11 +49,18 @@ bash src/inference/stop_vllm.sh
   Qwen3-VL-2B + vision encoder + KV cache. `start_vllm.sh` hard-codes
   `CUDA_VISIBLE_DEVICES=1` — change to `0` only if you've moved to a
   single-GPU machine.
-- **VRAM headroom**: `--gpu-memory-utilization 0.85` leaves 15% for
-  fragmentation; safe with A6000's 49GB.
+- **VRAM headroom**: `--gpu-memory-utilization 0.5` (= 23.7 GiB target on
+  A6000). paper3-server is shared with other tenants (sear / fedlmg_stage2
+  envs sometimes hold ~20 GiB on A6000). The previous 0.85 made vLLM
+  refuse to start with the residual free memory. Raise this back up to
+  0.85 if you confirm the other workloads are not running.
 - **`--max-model-len 8192`**: enough for chat + image + short video.
   Qwen3-VL's full 40960 context needs KV cache growth we don't need
   for V1 verification.
+- **libstdc++**: paper3-server's `/lib/x86_64-linux-gnu/libstdc++.so.6` is
+  6.0.30 (CXXABI_1.3.13) but vLLM 0.27.1 / PyTorch 2.13 need 1.3.15+.
+  `start_vllm.sh` prepends the conda env's `lib/` (which has 6.0.35) to
+  `LD_LIBRARY_PATH` to resolve newer symbols first.
 
 ## What this verifies
 
