@@ -48,6 +48,15 @@ class Settings(BaseSettings):
     wx_appid: str = ""
     wx_appsecret: str = ""
 
+    # vLLM (feat-002 + feat-017). Server-side Agent wraps this as an
+    # OpenAI-compatible ChatOpenAI client. `api_key` is ignored by vLLM
+    # (it doesn't validate), but langchain-openai requires a non-empty string.
+    vllm_base_url: str = "http://127.0.0.1:8000/v1"
+    vllm_model: str = "vlm-base"
+    vllm_api_key: str = "EMPTY"
+    vllm_temperature: float = 0.7
+    vllm_timeout_seconds: float = 60.0
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
