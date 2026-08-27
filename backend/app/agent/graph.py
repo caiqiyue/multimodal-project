@@ -1,25 +1,36 @@
 """LangGraph Agent that wraps the local vLLM as an OpenAI-compatible chat model.
 
-V1 scope (feat-017):
-- Single-node graph: START → call_llm → END.
+V1 scope (feat-017 + feat-018):
+- Two-node graph with conditional routing: START → call_llm → (tools?) → call_llm → ... → END.
+- Tools: `calculator` + `server_info` (see `tools.py`). Always bound to the LLM;
+  clients cannot opt out in V1 — tools are part of the agent's surface.
 - Stateless: each request ships the full conversation history. No checkpointer,
   no thread_id, no memory. (Persistence lands with feat-019 Postgres + /conversations.)
-- No tool calling. (feat-018 adds calculator + server_info tools.)
 - Synchronous response. (Streaming comes with feat-021 WebSocket.)
+
+Routing logic:
+- After `call_llm` returns, if the assistant message has `tool_calls`, route to
+  `tools`; otherwise end the graph.
+- After `tools` runs, route back to `call_llm` so the model can read the tool
+  output and produce a final answer.
+- Loop is bounded by langgraph's `recursion_limit` (default 25) — far above any
+  realistic tool-use trace.
 
 Reference: docs/项目总执行计划.md §21 + §22.
 """
 from __future__ import annotations
 
 import logging
-from typing import Annotated
+from typing import Annotated, Literal
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
 from typing_extensions import TypedDict
 
+from backend.app.agent.tools import ALL_TOOLS
 from backend.app.core.config import get_settings
 
 
@@ -44,30 +55,55 @@ def _build_llm() -> ChatOpenAI:
 
     vLLM does not validate the api_key, so `EMPTY` is fine. The model name must
     match the `--served-model-name` we launched vLLM with (default `vlm-base`).
+    The tools are bound here so every call carries them in the request payload;
+    vLLM requires `--enable-auto-tool-choice` + `--tool-call-parser hermes` to
+    interpret the tool_call tokens the model emits (see `src/inference/start_vllm.sh`).
     """
     settings = get_settings()
-    return ChatOpenAI(
+    base = ChatOpenAI(
         model=settings.vllm_model,
         base_url=settings.vllm_base_url,
         api_key=settings.vllm_api_key,
         temperature=settings.vllm_temperature,
         timeout=settings.vllm_timeout_seconds,
     )
+    return base.bind_tools(ALL_TOOLS)
 
 
 def _call_llm(state: AgentState) -> dict[str, list[BaseMessage]]:
-    """Single LLM node — takes the conversation so far, returns the assistant turn."""
+    """LLM node — takes the conversation so far, returns the assistant turn.
+
+    If the model decides to call a tool, the returned `AIMessage` will have
+    `tool_calls` populated. The conditional edge below routes to `tools` then.
+    """
     llm = _build_llm()
     response = llm.invoke(state["messages"])
     return {"messages": [response]}
 
 
+def _should_continue(state: AgentState) -> Literal["tools", "__end__"]:
+    """Conditional edge after `call_llm`.
+
+    Inspects the last assistant message: if it has at least one `tool_call`,
+    route to the `tools` node; otherwise return `END` to finish the graph.
+    """
+    last = state["messages"][-1]
+    if isinstance(last, AIMessage) and getattr(last, "tool_calls", None):
+        return "tools"
+    return END
+
+
 def build_graph():
     """Compile the V1 graph. Cheap to rebuild per request if needed."""
     graph = StateGraph(AgentState)
+
     graph.add_node("call_llm", _call_llm)
+    graph.add_node("tools", ToolNode(ALL_TOOLS))
+
     graph.add_edge(START, "call_llm")
-    graph.add_edge("call_llm", END)
+    graph.add_conditional_edges("call_llm", _should_continue)
+    graph.add_edge("tools", "call_llm")
+
     return graph.compile()
 
 
@@ -85,9 +121,10 @@ def get_agent():
     if _agent is None:
         _agent = build_graph()
         logger.info(
-            "LangGraph Agent compiled (model=%s base_url=%s)",
+            "LangGraph Agent compiled (model=%s base_url=%s tools=%s)",
             get_settings().vllm_model,
             get_settings().vllm_base_url,
+            [t.name for t in ALL_TOOLS],
         )
     return _agent
 
