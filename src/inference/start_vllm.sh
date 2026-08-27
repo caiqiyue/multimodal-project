@@ -54,6 +54,13 @@ if [ -d "$CONDA_LIB" ]; then
   export LD_LIBRARY_PATH="$CONDA_LIB:${LD_LIBRARY_PATH:-}"
 fi
 
+# Disable flashinfer — the conda env ships flashinfer-python 0.6.16 which
+# uses PEP 585 generic syntax (array.array[int]) that fails at import time
+# with "type 'array.array' is not subscriptable". We run single-GPU with
+# no tensor parallel, so vLLM's flashinfer code paths are unused.
+export VLLM_USE_FLASHINFER_SAMPLER=0
+export VLLM_USE_FLASHINFER_COMM=0
+
 # Best-effort kill of any prior vLLM on this port.
 if OLD_PID="$(fuser "${PORT}/tcp" 2>/dev/null)" && [ -n "$OLD_PID" ]; then
   echo "killing prior vLLM pid(s) on :$PORT: $OLD_PID"
