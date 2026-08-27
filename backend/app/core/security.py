@@ -7,6 +7,7 @@ tokens carry `type: "refresh"`, access tokens carry `type: "access"`.
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -68,12 +69,18 @@ def create_access_token(user_id: str) -> str:
 
 
 def create_refresh_token(user_id: str) -> str:
-    """Sign a long-lived refresh token (default 14 days)."""
+    """Sign a long-lived refresh token (default 14 days).
+
+    Includes a random `jti` (JWT ID) so successive refresh calls always produce
+    distinct tokens even when issued in the same second — needed for refresh
+    rotation to be observable by clients.
+    """
     settings = get_settings()
     now = _now()
     payload = {
         "sub": user_id,
         "type": "refresh",
+        "jti": uuid.uuid4().hex,
         "iat": int(now.timestamp()),
         "exp": int((now + timedelta(days=settings.refresh_token_expire_days)).timestamp()),
     }

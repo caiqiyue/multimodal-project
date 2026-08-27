@@ -6,7 +6,7 @@ from fastapi import Depends, Header, HTTPException, status
 from fastapi.security.utils import get_authorization_scheme_param
 
 from backend.app.core import users as users_store
-from backend.app.core.security import InvalidTokenError, decode_token
+from backend.app.core.security import InvalidTokenError, TokenTypeMismatchError, decode_token
 from backend.app.core.users import UserRecord
 
 
@@ -32,12 +32,12 @@ def get_current_user(authorization: str | None = Header(default=None)) -> UserRe
     """Decode the bearer access token and look up the user.
 
     Returns the UserRecord on success. Raises 401 on any auth failure
-    (missing header, bad scheme, expired token, unknown sub).
+    (missing header, bad scheme, expired token, wrong token type, unknown sub).
     """
     token = _extract_bearer(authorization)
     try:
         user_id = decode_token(token, expected_type="access")
-    except InvalidTokenError as exc:
+    except (InvalidTokenError, TokenTypeMismatchError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
