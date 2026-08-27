@@ -163,7 +163,34 @@ def test_agent_router_is_mounted_under_api_v1(client):
     assert r.status_code == 404
 
 
-def test_agent_module_imports_clean():
+def test_from_langchain_skips_tool_call_intermediates():
+    """feat-018: when the agent invokes a tool, the intermediate AIMessage
+    (content="" + tool_calls=[...]) and the ToolMessage must NOT appear in
+    the wire-format response. Otherwise the min_length=1 / role-regex
+    validation would 422."""
+    from langchain_core.messages import ToolMessage
+
+    from backend.app.api.agent import _from_langchain
+
+    synthetic = [
+        HumanMessage(content="23 * 47 = ?"),
+        AIMessage(
+            content="",
+            tool_calls=[{"name": "calculator", "args": {"expression": "23 * 47"}, "id": "x"}],
+        ),
+        # ToolMessage — must be skipped (no chat role for "tool").
+        ToolMessage(content="1081", tool_call_id="x"),
+        AIMessage(content="23 * 47 = 1081"),
+    ]
+    out = _from_langchain(synthetic)
+    assert len(out) == 2
+    assert out[0].role == "user"
+    assert out[0].content == "23 * 47 = ?"
+    assert out[1].role == "assistant"
+    assert out[1].content == "23 * 47 = 1081"
+
+
+
     """Sanity: the agent module + its LangChain deps import without side effects."""
     from backend.app.agent.graph import build_graph, get_agent, reset_agent
     from backend.app.api.agent import _to_langchain, _from_langchain

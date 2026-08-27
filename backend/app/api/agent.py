@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, status
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from backend.app.agent.graph import get_agent
 from backend.app.schemas.agent import (
@@ -45,16 +45,38 @@ def _to_langchain(messages: list[ChatMessage]) -> list:
 
 
 def _from_langchain(messages: list) -> list[ChatMessage]:
-    """Coerce LangChain messages back to wire-format ChatMessage."""
+    """Coerce LangChain messages back to wire-format ChatMessage.
+
+    Skips messages that don't fit the V1 chat shape:
+    - `ToolMessage` — the result of a tool invocation, not a chat turn.
+    - `AIMessage` with empty content + `tool_calls` — the model's "I want to
+      call a tool" intermediate; the actual final answer follows in a later
+      AIMessage.
+
+    If we forwarded these, the Pydantic `min_length=1` constraint on
+    `ChatMessage.content` would 422 (and there's no chat role for "tool").
+    """
     out: list[ChatMessage] = []
     for m in messages:
         if isinstance(m, HumanMessage):
-            role = "user"
+            role, content = "user", m.content
         elif isinstance(m, AIMessage):
-            role = "assistant"
-        else:  # SystemMessage or anything else
-            role = "system"
-        content = m.content if isinstance(m.content, str) else str(m.content)
+            # Drop intermediate tool-call AIMessages (content="" + tool_calls=[...]).
+            if getattr(m, "tool_calls", None) and not (isinstance(m.content, str) and m.content):
+                continue
+            role, content = "assistant", m.content
+        elif isinstance(m, SystemMessage):
+            role, content = "system", m.content
+        elif isinstance(m, ToolMessage):
+            # Tool result — not part of the chat transcript the client sees.
+            continue
+        else:
+            # Unknown message type — skip rather than coerce to a misleading role.
+            continue
+        if not isinstance(content, str):
+            content = str(content)
+        if not content:  # belt-and-braces — should already be filtered above
+            continue
         out.append(ChatMessage(role=role, content=content))
     return out
 
