@@ -1,4 +1,4 @@
-import type { ChatEventBase } from './envelope.js';
+import type { ChatEventBase } from './envelope';
 
 export interface MessageStartEvent extends ChatEventBase {
   type: 'message.start';

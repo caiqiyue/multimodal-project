@@ -1,3 +1,3 @@
-export * from './envelope.js';
-export * from './content.js';
-export * from './events.js';
+export * from './envelope';
+export * from './content';
+export * from './events';

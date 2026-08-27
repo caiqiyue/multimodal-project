@@ -1,4 +1,4 @@
-import type { Conversation } from '@multimodal/api-contract/conversation';
+import type { Conversation } from '@multimodal/api-contract';
 
 export const TEST_CONVERSATIONS: Conversation[] = [
   {

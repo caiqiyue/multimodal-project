@@ -1,4 +1,4 @@
-import type { User } from '@multimodal/api-contract/user';
+import type { User } from '@multimodal/api-contract';
 
 /**
  * Test users for MSW. Passwords are intentionally weak for development.

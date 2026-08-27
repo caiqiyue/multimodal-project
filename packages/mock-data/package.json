@@ -10,7 +10,8 @@
     "./users": "./src/users.ts",
     "./conversations": "./src/conversations.ts",
     "./messages": "./src/messages.ts",
-    "./media": "./src/media.ts"
+    "./media": "./src/media.ts",
+    "./auth": "./src/auth.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
