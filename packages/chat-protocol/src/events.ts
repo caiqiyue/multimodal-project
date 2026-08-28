@@ -3,15 +3,23 @@ import type { ChatEventBase } from './envelope.ts';
 export interface MessageStartEvent extends ChatEventBase {
   type: 'message.start';
   role: 'assistant';
+  /** Server-issued id; ties deltas + done to the same assistant turn. */
+  message_id: string;
 }
 
 export interface MessageDeltaEvent extends ChatEventBase {
   type: 'message.delta';
+  /** Server-issued id (matches the originating message.start). */
+  message_id: string;
   delta: string;
 }
 
 export interface MessageDoneEvent extends ChatEventBase {
   type: 'message.done';
+  /** Server-issued id (matches the originating message.start). */
+  message_id: string;
+  /** Concatenation of every delta the server emitted for this turn. */
+  full_content: string;
   finish_reason: 'stop' | 'length' | 'error';
   usage?: {
     prompt_tokens: number;
