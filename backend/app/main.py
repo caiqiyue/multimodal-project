@@ -11,8 +11,9 @@ Endpoints mounted:
 - POST /api/v1/auth/wechat-mini           → feat-026 (V1 stub; feat-037 makes real)
 - GET  /api/v1/me                         → feat-026 (bearer-protected)
 - POST /api/v1/agent/invoke               → feat-017 (LangGraph → vLLM)
+- WS   /api/v1/ws/chat                     → feat-021 (token + tool streaming)
 
-Reference: docs/项目总执行计划.md §21 + §23, feat-016 + feat-026 in feature_list.json.
+Reference: docs/项目总执行计划.md §21 + §23 + §24, feat-016 + feat-017 + feat-021 + feat-026 in feature_list.json.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import agent, auth, health, me
+from backend.app.api import agent, auth, health, me, ws_chat
 from backend.app.core.config import get_settings
 
 
@@ -76,13 +77,17 @@ def create_app() -> FastAPI:
     app.include_router(me.router, prefix="/api/v1")
 
     # Agent (feat-017) — synchronous LangGraph → vLLM chat invocation.
-    # Streaming / WebSocket lands in feat-021 on top of this same Agent.
     app.include_router(agent.router, prefix="/api/v1")
 
-    # Future routers mounted here by feat-021+:
+    # WebSocket streaming (feat-021) — astream_events-based token + tool
+    # streaming over a persistent connection. The `prefix` kwarg applies to
+    # websocket routes the same way it does to HTTP routes, so this mounts at
+    # /api/v1/ws/chat (the @router.websocket decorator declares "/ws/chat").
+    app.include_router(ws_chat.router, prefix="/api/v1")
+
+    # Future routers mounted here by feat-019+:
     # app.include_router(chat.router, prefix="/api/v1")
     # app.include_router(media.router, prefix="/api/v1")
-    # app.include_router(ws.router)  # WebSocket — separate lifespan
 
     return app
 

@@ -26,10 +26,26 @@ export interface StreamErrorEvent extends ChatEventBase {
   message: string;
 }
 
+export interface ToolCallEvent extends ChatEventBase {
+  type: 'tool.call';
+  name: string;
+  args: Record<string, unknown>;
+  tool_call_id: string;
+}
+
+export interface ToolResultEvent extends ChatEventBase {
+  type: 'tool.result';
+  name: string;
+  content: string;
+  tool_call_id: string;
+}
+
 export type ChatEvent =
   | MessageStartEvent
   | MessageDeltaEvent
   | MessageDoneEvent
+  | ToolCallEvent
+  | ToolResultEvent
   | StreamErrorEvent;
 
 export type ChatEventType = ChatEvent['type'];
