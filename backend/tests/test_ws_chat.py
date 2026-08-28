@@ -59,6 +59,20 @@ def _build_simple_stub_agent():
     return graph.compile()
 
 
+class _ToolStubChatModel(FakeMessagesListChatModel):
+    """Stub chat model whose canned responses already carry tool_calls.
+
+    `bind_tools` returns self because we don't actually need the model to
+    know about the tool schema — we already wrote the AIMessage objects
+    with the right tool_call payloads in `responses`. The default
+    implementation raises NotImplementedError, which would break the
+    call_llm node in the test graph.
+    """
+
+    def bind_tools(self, tools, **kwargs):  # noqa: ARG002 — match BaseChatModel signature
+        return self
+
+
 def _build_tool_stub_agent():
     """call_llm → tools → call_llm → END. Exercises tool.call / tool.result streaming.
 
@@ -66,7 +80,7 @@ def _build_tool_stub_agent():
     only accepts `responses: list[str]` — we need to emit AIMessage objects
     with `tool_calls` populated.
     """
-    fake = FakeMessagesListChatModel(
+    fake = _ToolStubChatModel(
         responses=[
             AIMessage(
                 content="",
@@ -77,10 +91,9 @@ def _build_tool_stub_agent():
             AIMessage(content="23 * 47 = 1081"),
         ]
     )
-    llm_with_tools = fake.bind_tools([_stub_calc])
 
     def call_llm(state):
-        response = llm_with_tools.invoke(state["messages"])
+        response = fake.invoke(state["messages"])
         return {"messages": [response]}
 
     def should_continue(state):
