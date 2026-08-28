@@ -19,7 +19,10 @@ from typing import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.language_models.fake_chat_models import (
+    FakeListChatModel,
+    FakeMessagesListChatModel,
+)
 from langchain_core.messages import AIMessage
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
@@ -57,8 +60,13 @@ def _build_simple_stub_agent():
 
 
 def _build_tool_stub_agent():
-    """call_llm → tools → call_llm → END. Exercises tool.call / tool.result streaming."""
-    fake = FakeListChatModel(
+    """call_llm → tools → call_llm → END. Exercises tool.call / tool.result streaming.
+
+    Uses FakeMessagesListChatModel (not FakeListChatModel) because the latter
+    only accepts `responses: list[str]` — we need to emit AIMessage objects
+    with `tool_calls` populated.
+    """
+    fake = FakeMessagesListChatModel(
         responses=[
             AIMessage(
                 content="",
