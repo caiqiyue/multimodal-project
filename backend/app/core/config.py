@@ -60,7 +60,11 @@ class Settings(BaseSettings):
     # Media upload (feat-020). Local-disk storage for V1 (no object-store dependency).
     # Files are written under media_data_root / user_id / media_id.ext; the
     # public link is media_public_base_url + '/' + media_id.
-    media_data_root: str = "/data/media"
+    # Default is a project-relative path so the same code runs on Mac (dev)
+    # and on the server (production) without needing a global writable mount.
+    # Override via MEDIA_DATA_ROOT env var or `.env` for ops paths like
+    # /var/lib/multimodal/media. The directory is created on first upload.
+    media_data_root: str = "data/media"
     media_public_base_url: str = "/api/v1/media"
 
 
