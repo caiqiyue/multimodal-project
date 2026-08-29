@@ -31,6 +31,13 @@ export default defineConfig<'webpack5'>(async (merge, _args) => {
           "@tarojs/plugin-generator",
         ],
     defineConstants: {
+      // Feat-131 env seam — Taro 4 inlines process.env.TARO_APP_* at build
+      // time when listed here. Default '' keeps MSW (H5) + plugin-mock sidecar
+      // (weapp) intercepting /auth/* + /health. Set in env to point at the
+      // real backend (e.g. http://127.0.0.1:9000/api/v1 via SSH tunnel).
+      'process.env.TARO_APP_API_BASE_URL': JSON.stringify(
+        process.env.TARO_APP_API_BASE_URL ?? '',
+      ),
     },
     copy: {
       patterns: [

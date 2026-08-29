@@ -1,6 +1,10 @@
 import { getAccessToken } from './tokenStorage';
 
-const API_BASE_URL = '';
+// TARO_APP_API_BASE_URL falls through to '' in mock-first dev so MSW (H5) /
+// @tarojs/plugin-mock sidecar (weapp) keep intercepting /auth/* and /health.
+// When set to the real backend (e.g. http://127.0.0.1:9000/api/v1), both
+// authFetch and chat WebSocket target the FastAPI server via SSH tunnel.
+const API_BASE_URL = process.env.TARO_APP_API_BASE_URL ?? '';
 
 /**
  * Authenticated fetch wrapper for the mini-program.

@@ -6,7 +6,8 @@ import {
   setTokens,
 } from './tokenStorage';
 
-const API_BASE_URL = '';
+// Mirror of api.ts — same env var, same fallback behavior (mock-first).
+const API_BASE_URL = process.env.TARO_APP_API_BASE_URL ?? '';
 
 /**
  * WeChat Mini Program login (feat-121, mock-first).

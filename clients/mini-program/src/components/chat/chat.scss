@@ -1,0 +1,234 @@
+/*
+ * Shared SCSS for the chat UI (feat-131).
+ *
+ * Mirrors mobile-app's React Native StyleSheet shapes — same color tokens,
+ * same spacing, same BEM-style class names. Taro uses className-based styling
+ * (no StyleSheet API), so each component renders with the class names below.
+ */
+
+.chat-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #ffffff;
+}
+
+.chat-screen__header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 32rpx;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.chat-screen__title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #111827;
+}
+
+.chat-screen__subtitle {
+  font-size: 24rpx;
+  color: #6b7280;
+  margin-top: 4rpx;
+}
+
+.chat-screen__actions {
+  display: flex;
+  flex-direction: row;
+  gap: 12rpx;
+}
+
+.chat-screen__action-btn {
+  font-size: 24rpx;
+  padding: 0 16rpx;
+}
+
+.chat-screen__hint {
+  background-color: #fef3c7;
+  color: #92400e;
+  font-size: 24rpx;
+  padding: 16rpx 24rpx;
+  line-height: 36rpx;
+}
+
+.chat-status {
+  padding: 12rpx 24rpx;
+  text-align: center;
+}
+
+.chat-status--connecting {
+  background-color: #fef3c7;
+}
+
+.chat-status--open {
+  background-color: #d1fae5;
+}
+
+.chat-status--closed {
+  background-color: #fee2e2;
+}
+
+.chat-status__text {
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.chat-list {
+  flex: 1;
+  padding: 16rpx 0;
+}
+
+.chat-list__empty {
+  text-align: center;
+  color: #6b7280;
+  font-size: 28rpx;
+  margin-top: 80rpx;
+  padding: 0 48rpx;
+  line-height: 44rpx;
+}
+
+.chat-bubble-row {
+  display: flex;
+  flex-direction: row;
+  margin: 8rpx 24rpx;
+}
+
+.chat-bubble-row--user {
+  justify-content: flex-end;
+}
+
+.chat-bubble-row--assistant {
+  justify-content: flex-start;
+}
+
+.chat-bubble-row--error {
+  justify-content: center;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  border-radius: 24rpx;
+  padding: 20rpx;
+}
+
+.chat-bubble--user {
+  background-color: #3b82f6;
+}
+
+.chat-bubble--assistant {
+  background-color: #f3f4f6;
+}
+
+.chat-bubble--error {
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+}
+
+.chat-bubble__user-text {
+  color: #ffffff;
+  font-size: 32rpx;
+  line-height: 44rpx;
+  word-break: break-word;
+}
+
+.chat-bubble__error-label {
+  color: #991b1b;
+  font-weight: 600;
+  font-size: 24rpx;
+  margin-bottom: 8rpx;
+}
+
+.chat-bubble__error-message {
+  color: #7f1d1d;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  word-break: break-word;
+}
+
+.chat-streaming {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.chat-streaming__text {
+  font-size: 32rpx;
+  line-height: 44rpx;
+  color: #111827;
+  word-break: break-word;
+}
+
+.chat-streaming__caret {
+  font-size: 28rpx;
+  color: #888888;
+  margin-left: 4rpx;
+}
+
+.chat-tool-card {
+  background-color: #f3f0ff;
+  border: 1px solid #c8b8ff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  margin: 12rpx 0;
+}
+
+.chat-tool-card__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+  color: #5b21b6;
+}
+
+.chat-tool-card__args {
+  font-size: 24rpx;
+  color: #3b0764;
+  background-color: #ede9fe;
+  padding: 12rpx;
+  border-radius: 8rpx;
+  margin-bottom: 12rpx;
+  word-break: break-all;
+  font-family: monospace;
+}
+
+.chat-tool-card__label {
+  font-size: 24rpx;
+  color: #5b21b6;
+  margin-bottom: 4rpx;
+}
+
+.chat-tool-card__result {
+  font-size: 24rpx;
+  color: #1f2937;
+  background-color: #ffffff;
+  padding: 12rpx;
+  border-radius: 8rpx;
+  border: 1px solid #e5e7eb;
+  word-break: break-all;
+  font-family: monospace;
+}
+
+.chat-input-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16rpx;
+  padding: 16rpx 24rpx;
+  border-top: 1px solid #e5e7eb;
+  background-color: #ffffff;
+}
+
+.chat-input-row__input {
+  flex: 1;
+  border: 1px solid #dddddd;
+  border-radius: 16rpx;
+  padding: 16rpx 24rpx;
+  font-size: 32rpx;
+  background-color: #fafafa;
+}
+
+.chat-input-row__button {
+  font-size: 28rpx;
+}
