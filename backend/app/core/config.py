@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     vllm_temperature: float = 0.7
     vllm_timeout_seconds: float = 60.0
 
+    # Media upload (feat-020). Local-disk storage for V1 (no object-store dependency).
+    # Files are written under media_data_root / user_id / media_id.ext; the
+    # public link is media_public_base_url + '/' + media_id.
+    media_data_root: str = "/data/media"
+    media_public_base_url: str = "/api/v1/media"
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
