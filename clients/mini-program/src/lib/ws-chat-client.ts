@@ -57,11 +57,18 @@ export interface SocketTaskLike {
   onError(callback: (ev: Event) => void): void;
 }
 
-export type SocketTaskFactory = (url: string) => SocketTaskLike;
+export type SocketTaskFactory = (url: string) => SocketTaskLike | Promise<SocketTaskLike>;
 
-const defaultSocketTaskFactory: SocketTaskFactory = (url) => {
-  const task = Taro.connectSocket({ url });
-  return task as unknown as SocketTaskLike;
+/**
+ * Taro 4's connectSocket returns Promise<SocketTask> on H5 (the JS Promise
+ * wraps the underlying browser WebSocket creation), but returns the
+ * SocketTask directly on the weapp target where wx.connectSocket is sync.
+ * The factory type allows either shape; ChatClient.connect() awaits the
+ * result before wiring event handlers.
+ */
+const defaultSocketTaskFactory: SocketTaskFactory = async (url) => {
+  const task = (await Taro.connectSocket({ url })) as unknown as SocketTaskLike;
+  return task;
 };
 
 export class ChatClient {
@@ -82,11 +89,11 @@ export class ChatClient {
   }
 
   /** Open the underlying socket. Idempotent — calling twice is a no-op. */
-  connect(): void {
+  async connect(): Promise<void> {
     if (this.task) {
       return;
     }
-    const task = this.factory(this.url);
+    const task = await this.factory(this.url);
     task.onOpen(() => {
       this.open = true;
       this.callbacks.onConnectionOpen?.();

@@ -87,8 +87,11 @@ export function useChatStream(options: UseChatStreamOptions): UseChatStreamResul
 
   const clientRef = useRef<ChatClient | null>(null);
 
-  const appendAssistant = useCallback((): string => {
-    const id = nextId('asst');
+  const appendAssistant = useCallback((serverMessageId: string): string => {
+    // Use the server's message_id as the local id so message.delta / message.done
+    // / tool.call / tool.result events (which all carry the same server-side id)
+    // can find their bubble. Local counters would never match the server UUIDs.
+    const id = serverMessageId;
     setMessages((prev) => [
       ...prev,
       { id, kind: 'assistant', content: '', streaming: true, toolCalls: [] },
@@ -97,8 +100,10 @@ export function useChatStream(options: UseChatStreamOptions): UseChatStreamResul
   }, []);
 
   const handleStart = useCallback(
-    (_event: MessageStartEvent) => {
-      appendAssistant();
+    (event: MessageStartEvent) => {
+      // Server has begun streaming a turn — open a fresh assistant bubble
+      // keyed by the server-issued message_id (used by deltas / done / tool events).
+      appendAssistant(event.message_id);
       setIsStreaming(true);
     },
     [appendAssistant],

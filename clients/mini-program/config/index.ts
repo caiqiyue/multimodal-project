@@ -35,6 +35,11 @@ export default defineConfig<'webpack5'>(async (merge, _args) => {
       // time when listed here. Default '' keeps MSW (H5) + plugin-mock sidecar
       // (weapp) intercepting /auth/* + /health. Set in env to point at the
       // real backend (e.g. http://127.0.0.1:9000/api/v1 via SSH tunnel).
+      //
+      // NOTE (Session 019): Taro 4 does NOT auto-load .env / .env.{TARO_ENV}
+      // files for defineConstants. Either pass via shell env when invoking
+      // taro CLI, or patch webpack.DefinePlugin directly. The mock-first
+      // default ('') keeps dev workflow unbroken for now.
       'process.env.TARO_APP_API_BASE_URL': JSON.stringify(
         process.env.TARO_APP_API_BASE_URL ?? '',
       ),
