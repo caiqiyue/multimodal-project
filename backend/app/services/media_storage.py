@@ -105,7 +105,7 @@ async def save_upload(
         total += len(chunk)
         if total > cap:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 detail=f"file too large ({kind} max {cap // (1024 * 1024)} MB)",
             )
         chunks.append(chunk)
