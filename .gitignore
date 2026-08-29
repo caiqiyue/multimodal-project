@@ -124,6 +124,7 @@ model-serving/cache/
 # 第四优先级：数据集（图片/视频/原始 JSONL）
 # ============================================================
 data/raw/
+data/media/
 data/samples/*.jpg
 data/samples/*.jpeg
 data/samples/*.png
