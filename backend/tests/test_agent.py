@@ -5,6 +5,8 @@ Coverage:
 - Response shape contract (`messages` echo + `reply` shortcut)
 - Pydantic validation (empty messages, missing field, extra field, invalid role,
   empty content, content over max length)
+- Multi-modal content blocks (feat-022): str content (back-compat) +
+  list[ContentBlock] (text + image_url)
 
 The real LangGraph Agent is replaced by an in-process stub backed by
 `FakeListChatModel` so pytest does not need vLLM running. The stub exercises
@@ -61,7 +63,7 @@ def client() -> Iterator[TestClient]:
         yield c
 
 
-# ===== happy path =====
+# ===== happy path (str content, V1 backward-compat) =====
 
 
 def test_invoke_returns_assistant_reply_and_full_history(client, stub_agent):
@@ -190,7 +192,7 @@ def test_from_langchain_skips_tool_call_intermediates():
     assert out[1].content == "23 * 47 = 1081"
 
 
-
+def test_module_imports_and_coercion_round_trip():
     """Sanity: the agent module + its LangChain deps import without side effects."""
     from backend.app.agent.graph import build_graph, get_agent, reset_agent
     from backend.app.api.agent import _to_langchain, _from_langchain
@@ -215,6 +217,226 @@ def test_from_langchain_skips_tool_call_intermediates():
     # reset_agent is safe to call on a fresh cache
     reset_agent()
     assert graph_module._agent is None
+
+
+# ===== feat-022 — multi-modal content blocks =====
+
+
+def test_to_langchain_converts_text_block_list_to_dict_list():
+    """A single text block in a list becomes OpenAI-style {type, text} dict."""
+    from backend.app.api.agent import _to_langchain
+    from backend.app.schemas.agent import ContentBlock, TextContentBlock
+
+    msgs = _to_langchain([
+        ChatMessage(
+            role="user",
+            content=[TextContentBlock(type="text", text="describe this")],
+        ),
+    ])
+    assert isinstance(msgs[0], HumanMessage)
+    assert msgs[0].content == [{"type": "text", "text": "describe this"}]
+
+
+def test_to_langchain_converts_image_url_block_to_dict():
+    """An image_url block becomes the OpenAI-style {type, image_url:{url}} dict."""
+    from backend.app.api.agent import _to_langchain
+    from backend.app.schemas.agent import ImageUrlContentBlock
+
+    msgs = _to_langchain([
+        ChatMessage(
+            role="user",
+            content=[ImageUrlContentBlock(
+                type="image_url",
+                image_url={"url": "http://127.0.0.1:9000/api/v1/media/abc"},
+            )],
+        ),
+    ])
+    assert isinstance(msgs[0], HumanMessage)
+    assert msgs[0].content == [
+        {
+            "type": "image_url",
+            "image_url": {"url": "http://127.0.0.1:9000/api/v1/media/abc"},
+        },
+    ]
+
+
+def test_to_langchain_converts_multi_block_message(client, stub_agent):
+    """A user message mixing text + image_url reaches the stub model intact."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "看这张图"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "http://127.0.0.1:9000/api/v1/media/abc"},
+                        },
+                    ],
+                },
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # Stub still emits plain text — reply shape unchanged for V1 models.
+    assert body["reply"] == _STUB_REPLY
+    assert body["messages"][0]["role"] == "user"
+
+
+def test_to_langchain_rejects_empty_block_list_with_422(client):
+    """A `content: []` message is meaningless — must 422."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={"messages": [{"role": "user", "content": []}]},
+    )
+    assert r.status_code == 422
+
+
+def test_to_langchain_rejects_too_many_blocks_with_422(client):
+    """More than MAX_BLOCKS_PER_MESSAGE blocks must 422."""
+    from backend.app.api.agent import MAX_BLOCKS_PER_MESSAGE
+
+    blocks = [{"type": "text", "text": f"block {i}"} for i in range(MAX_BLOCKS_PER_MESSAGE + 1)]
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={"messages": [{"role": "user", "content": blocks}]},
+    )
+    assert r.status_code == 422
+
+
+def test_pydantic_rejects_unknown_block_type_with_422(client):
+    """Discriminated union must reject an unknown `type` discriminator value."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"type": "audio_url", "audio_url": {"url": "x"}}],
+                },
+            ],
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_pydantic_rejects_missing_block_field_with_422(client):
+    """A text block without `text` must 422 (TextContentBlock.text is required)."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {"role": "user", "content": [{"type": "text"}]},
+            ],
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_pydantic_rejects_image_url_block_without_url_with_422(client):
+    """An image_url block without an image_url.url object must 422."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [{"type": "image_url", "image_url": {}}],
+                },
+            ],
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_pydantic_accepts_image_url_block_with_detail(client):
+    """detail=auto/high/low is OpenAI-standard and should pass through."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": "http://127.0.0.1:9000/api/v1/media/xyz",
+                                "detail": "high",
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+
+
+def test_pydantic_rejects_video_url_block_in_v1(client):
+    """video_url blocks are V3 (Qwen3-VL supports but OpenAI-compat doesn't).
+    The V1 schema rejects them at the boundary."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "video_url", "video_url": {"url": "http://x/y.mp4"}},
+                    ],
+                },
+            ],
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_system_message_with_str_content_still_works(client, stub_agent):
+    """V1 system messages (str content) must continue to work."""
+    r = client.post(
+        "/api/v1/agent/invoke",
+        json={
+            "messages": [
+                {"role": "system", "content": "be terse"},
+                {"role": "user", "content": "hi"},
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["reply"] == _STUB_REPLY
+
+
+def test_to_langchain_dispatches_by_role_for_blocks(client, stub_agent):
+    """user/assistant/system all accept list[ContentBlock]; _to_langchain
+    constructs the right LangChain subclass for each."""
+    from backend.app.api.agent import _to_langchain
+    from backend.app.schemas.agent import TextContentBlock
+
+    msgs = _to_langchain([
+        ChatMessage(
+            role="system",
+            content=[TextContentBlock(type="text", text="you are helpful")],
+        ),
+        ChatMessage(
+            role="user",
+            content=[TextContentBlock(type="text", text="hi")],
+        ),
+        ChatMessage(
+            role="assistant",
+            content=[TextContentBlock(type="text", text="hello!")],
+        ),
+    ])
+    assert isinstance(msgs[0], SystemMessage)
+    assert isinstance(msgs[1], HumanMessage)
+    assert isinstance(msgs[2], AIMessage)
+    # All three have list content (not str)
+    for m in msgs:
+        assert isinstance(m.content, list)
 
 
 # ===== /health still works (regression: feat-016) =====
