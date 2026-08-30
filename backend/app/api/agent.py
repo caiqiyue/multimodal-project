@@ -96,7 +96,7 @@ def _to_langchain(messages: list[ChatMessage]) -> list:
                 lc_content = _blocks_to_lc_content(m.content)
             except ContentShapeError as exc:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=str(exc),
                 ) from exc
 

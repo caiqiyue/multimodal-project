@@ -16,7 +16,13 @@ from __future__ import annotations
 
 from typing import Annotated, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    StringConstraints,
+)
 
 
 # ===== Content blocks (discriminated union on `type`) =====
@@ -31,21 +37,28 @@ class TextContentBlock(BaseModel):
     text: Annotated[str, StringConstraints(min_length=1, max_length=32_000)]
 
 
-class ImageUrlContentBlock(BaseModel):
-    """A reference to an image by URL.
+class ImageUrlPayload(BaseModel):
+    """Inner `image_url` object — mirrors the OpenAI spec.
 
-    `url` may be an absolute http(s) URL or a server-relative path
-    (`/api/v1/media/{id}`) that resolves through the public file-serve
-    endpoint added by feat-020. `detail` matches OpenAI's options and is
-    forwarded verbatim to vLLM.
+    `url` must be an absolute http(s) URL. We accept server-relative paths
+    (`/api/v1/media/{id}`) too — vLLM resolves them through its base URL
+    when fetching. `detail` matches OpenAI's options and is forwarded
+    verbatim.
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    url: str = Field(min_length=1, description="Absolute URL or server-relative path")
+    detail: Literal["low", "high", "auto"] | None = None
+
+
+class ImageUrlContentBlock(BaseModel):
+    """A reference to an image by URL."""
+
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["image_url"]
-    image_url: dict = Field(
-        description="OpenAI-style {url, detail?} object",
-    )
+    image_url: ImageUrlPayload
 
 
 # Use a true discriminated union so Pydantic dispatches on the `type` field.
@@ -65,20 +78,25 @@ class ChatMessage(BaseModel):
       - a non-empty string (legacy V1 path; plain text)
       - a list of ContentBlocks (V2 path; multi-modal — text + image_url)
 
-    When `content` is a list, it must contain at least one block and no more
-    than 16 (vLLM Qwen3-VL practical limit). Pydantic's `Union` does not
-    emit a discriminator for the union itself, so we accept either shape and
-    run a small validator to enforce the list bounds.
+    Per-shape constraints:
+      - str: min_length=1, max_length=32000 (matches the V1 cap)
+      - list: 1..MAX_BLOCKS_PER_MESSAGE (validated in _to_langchain since
+        Pydantic's `Union` over Union doesn't easily express length bounds
+        on the list branch)
+
+    Hard rejection at the schema layer:
+      - extra fields → 422 (extra="forbid")
+      - empty list / empty string → 422
+      - unknown block type → 422 (discriminated union dispatch)
     """
 
     model_config = ConfigDict(extra="forbid")
 
     role: str = Field(pattern="^(user|assistant|system)$")
-    content: Union[str, list[ContentBlock]]
-
-    @property
-    def content_is_blocks(self) -> bool:
-        return isinstance(self.content, list)
+    content: Union[
+        Annotated[str, StringConstraints(min_length=1, max_length=32_000)],
+        list[ContentBlock],
+    ]
 
 
 class AgentInvokeRequest(BaseModel):
