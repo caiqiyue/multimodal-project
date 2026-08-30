@@ -73,7 +73,13 @@ def _blocks_to_lc_content(blocks: list[ContentBlock]) -> list[dict[str, Any]]:
         if b.type == "text":
             out.append({"type": "text", "text": b.text})  # type: ignore[attr-defined]
         elif b.type == "image_url":
-            out.append({"type": "image_url", "image_url": dict(b.image_url)})  # type: ignore[attr-defined]
+            # model_dump(exclude_none=True) keeps the wire payload clean —
+            # `detail: None` would just add noise and the OpenAI spec marks
+            # `detail` as optional (so omitting is the canonical shape).
+            out.append({
+                "type": "image_url",
+                "image_url": b.image_url.model_dump(exclude_none=True),  # type: ignore[attr-defined]
+            })
         else:  # defensive — discriminator should prevent this branch
             raise ContentShapeError(f"unsupported content block type: {b.type}")
     return out
