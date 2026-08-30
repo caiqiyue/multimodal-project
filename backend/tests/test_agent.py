@@ -352,7 +352,7 @@ def test_pydantic_rejects_image_url_block_without_url_with_422(client):
     assert r.status_code == 422
 
 
-def test_pydantic_accepts_image_url_block_with_detail(client):
+def test_pydantic_accepts_image_url_block_with_detail(client, stub_agent):
     """detail=auto/high/low is OpenAI-standard and should pass through."""
     r = client.post(
         "/api/v1/agent/invoke",
