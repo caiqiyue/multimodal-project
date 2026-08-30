@@ -1,49 +1,38 @@
 import { z } from 'zod';
 
-// ===== Content blocks =====
+import { ContentBlockSchema, MessageRoleSchema } from './agent.ts';
 
-export const TextContentSchema = z.object({
-  type: z.literal('text'),
-  text: z.string(),
-});
-export type TextContent = z.infer<typeof TextContentSchema>;
+// Re-export for back-compat with clients that imported these from chat.ts.
+// (Original V1 placed them in chat.ts; V2 (feat-022) canonicalised them in
+// agent.ts so HTTP /agent/invoke and WS /ws/chat can share the discriminated
+// union. chat.ts still keeps its narrower ChatMessageSchema below because
+// the WS stream is text-only until V2 widens the WS payload — see the
+// vertical slice plan in NEXT_SESSION.md.)
+export {
+  TextContentBlockSchema,
+  ImageUrlPayloadSchema,
+  ImageUrlContentBlockSchema,
+  ContentBlockSchema,
+  MessageRoleSchema,
+} from './agent.ts';
+export type {
+  TextContentBlock,
+  ImageUrlPayload,
+  ImageUrlContentBlock,
+  ContentBlock,
+  MessageRole,
+} from './agent.ts';
 
-export const ImageUrlContentSchema = z.object({
-  type: z.literal('image_url'),
-  image_url: z.object({
-    url: z.string().url(),
-    detail: z.enum(['low', 'high', 'auto']).optional(),
-  }),
-});
-export type ImageUrlContent = z.infer<typeof ImageUrlContentSchema>;
-
-export const VideoUrlContentSchema = z.object({
-  type: z.literal('video_url'),
-  video_url: z.object({
-    url: z.string().url(),
-  }),
-});
-export type VideoUrlContent = z.infer<typeof VideoUrlContentSchema>;
-
-export const ContentBlockSchema = z.discriminatedUnion('type', [
-  TextContentSchema,
-  ImageUrlContentSchema,
-  VideoUrlContentSchema,
-]);
-export type ContentBlock = z.infer<typeof ContentBlockSchema>;
-
-// ===== Messages =====
-
-export const MessageRoleSchema = z.enum(['user', 'assistant', 'system']);
-export type MessageRole = z.infer<typeof MessageRoleSchema>;
-
+// WS-flavoured ChatMessage: in V1 the WS stream only accepts plain text;
+// V2 (feat-033+ mini-program coordination) will widen content to the same
+// union the HTTP endpoint exposes. Keeping the schema here narrower than
+// AgentChatMessageSchema avoids forcing a wire-contract bump on existing WS
+// clients until the V2 plan lands.
 export const ChatMessageSchema = z.object({
   role: MessageRoleSchema,
-  content: z.array(ContentBlockSchema),
+  content: z.array(ContentBlockSchema).min(1),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
-
-// ===== Stream request =====
 
 export const ChatStreamRequestSchema = z.object({
   conversation_id: z.string(),

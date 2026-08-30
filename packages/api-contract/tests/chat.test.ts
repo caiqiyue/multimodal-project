@@ -27,15 +27,18 @@ describe('chat schemas', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts video_url content block', () => {
+  it('rejects video_url content block (V3, not in V1)', () => {
+    // V1 only supports text + image_url. video_url lands with feat-040
+    // (Qwen3-VL supports video via vLLM but the OpenAI-compat surface we
+    // proxy through doesn't yet have video_url — see NEXT_SESSION.md §3.5).
     const result = ChatStreamRequestSchema.safeParse({
       conversation_id: 'conv_1',
       message: {
         role: 'user',
-        content: [{ type: 'video_url', video_url: { url: 'https://example.com/v.mp4' } }],
+        content: [{ type: 'video_url', video_url: { url: 'https://example.com/v.mp4' } } as never],
       },
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
   it('rejects unknown content type', () => {

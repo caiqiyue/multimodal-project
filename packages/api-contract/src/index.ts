@@ -3,6 +3,7 @@
 // literal path (./auth) and only checks for .js / .mjs / .cjs, never .ts.
 // Webpack (browser bundles) and vitest (test runner) ignore the extension,
 // so this works across all three runtimes.
+export * from './agent.ts';
 export * from './auth.ts';
 export * from './chat.ts';
 export * from './media.ts';
