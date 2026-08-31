@@ -5,11 +5,13 @@
  *  - The persistent ChatClient (via useChatStream).
  *  - The list of messages rendered in the chat window.
  *  - Connection lifecycle and "is streaming" state.
+ *  - The caption text + image picker for the next user turn.
  *
  * Pure presentational pieces (MessageBubble / StreamingText / ToolCallCard /
- * ConnectionStatus / ChatInput) live in `../components/chat/`.
+ * ConnectionStatus / ChatInput / ImagePickerButton / MediaPreview) live in
+ * `../components/chat/`.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Button,
   FlatList,
@@ -22,8 +24,9 @@ import {
 
 import { ChatInput } from '../components/chat/ChatInput';
 import { ConnectionStatus } from '../components/chat/ConnectionStatus';
+import { ImagePickerButton } from '../components/chat/ImagePickerButton';
 import { MessageBubble } from '../components/chat/MessageBubble';
-import type { MessageItem } from '../hooks/useChatStream';
+import type { LocalMedia, MessageItem } from '../hooks/useChatStream';
 import { useChatStream } from '../hooks/useChatStream';
 import { resolveChatWsUrl } from '../lib/ws-chat-client';
 import type { User } from '@multimodal/api-contract/auth';
@@ -40,12 +43,36 @@ export function ChatScreen({ user, onLogout }: Props) {
   const { messages, connectionState, send, isStreaming, reset } = useChatStream({
     url: wsUrl,
   });
+  const [caption, setCaption] = useState('');
 
-  const handleSend = useCallback(
+  const handleSendText = useCallback(
     (text: string) => {
       send([{ role: 'user', content: text }]);
+      setCaption('');
     },
     [send],
+  );
+
+  const handleMediaReady = useCallback(
+    (media: LocalMedia[]) => {
+      // Picker just finished — send the turn immediately with whatever
+      // caption the user has typed, plus a fallback if they didn't type
+      // anything. Video-only sends get a Chinese fallback so the agent
+      // has *something* to respond to (V1 has no video_url block; the
+      // video is rendered locally but not forwarded to the agent — see
+      // useChatStream.blocksForUserSend).
+      const trimmed = caption.trim();
+      const hasVideo = media.some((m) => m.mediaType === 'video');
+      const fallback = media.length === 1 && media[0]?.mediaType === 'image'
+        ? '看这张图'
+        : hasVideo
+          ? '我发了一段视频'
+          : '看看这些';
+      const text = trimmed.length > 0 ? trimmed : fallback;
+      send([{ role: 'user', content: text, media }]);
+      setCaption('');
+    },
+    [caption, send],
   );
 
   const renderItem = useCallback(
@@ -84,12 +111,24 @@ export function ChatScreen({ user, onLogout }: Props) {
         contentContainerStyle={styles.list}
         ListEmptyComponent={
           <Text style={styles.empty}>
-            👋 Hi @{user.username}。 输入消息，按回车或点击「发送」。
+            👋 Hi @{user.username}。 输入消息，按回车或点击「发送」。 点 📎 上传图片或视频。
           </Text>
         }
       />
 
-      <ChatInput onSend={handleSend} disabled={isDisconnected} isStreaming={isStreaming} />
+      <View style={styles.inputRow}>
+        <ChatInput
+          value={caption}
+          onChangeText={setCaption}
+          onSend={handleSendText}
+          disabled={isDisconnected}
+          isStreaming={isStreaming}
+        />
+        <ImagePickerButton
+          onMediaReady={handleMediaReady}
+          disabled={isDisconnected || isStreaming}
+        />
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -121,5 +160,13 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 40,
     paddingHorizontal: 24,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#ccc',
+    backgroundColor: '#fff',
   },
 });

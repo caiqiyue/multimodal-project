@@ -8,6 +8,12 @@
  * - Throw on `send()` if the socket isn't open — caller should disable send
  *   buttons while disconnected.
  *
+ * Wire format: `content` may be a plain string (V1 path, text-only) OR a
+ * ContentBlock[] (V2 path, multi-modal). The backend WS endpoint does not
+ * validate the shape — it forwards whatever JSON the client sends straight
+ * to the agent, where `_to_langchain` dispatches on shape. See
+ * backend/app/agent/_to_langchain.py + session-handoff.md.
+ *
  * Reference: docs/项目总执行计划.md §24, feature_list.json feat-021 + feat-130.
  */
 import type {
@@ -19,10 +25,11 @@ import type {
   ToolCallEvent,
   ToolResultEvent,
 } from '@multimodal/chat-protocol/events';
+import type { ContentBlock } from '@multimodal/api-contract/chat';
 
 export type ChatMessageInput = {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | ContentBlock[];
 };
 
 export interface ChatClientCallbacks {
