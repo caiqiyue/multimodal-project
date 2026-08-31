@@ -8,7 +8,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.mobile-app"
+      "bundleIdentifier": "com.anonymous.mobile-app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Falcon needs access to your photo library so you can attach images and videos to chat messages.",
+        "NSCameraUsageDescription": "Falcon uses the camera so you can capture photos to send in chat."
+      }
     },
     "android": {
       "adaptiveIcon": {
