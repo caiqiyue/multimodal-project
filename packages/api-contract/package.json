@@ -3,17 +3,36 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
+  "main": "./dist/index.js",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./auth": "./src/auth.ts",
-    "./chat": "./src/chat.ts",
-    "./media": "./src/media.ts",
-    "./conversation": "./src/conversation.ts",
-    "./user": "./src/user.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./auth": {
+      "types": "./src/auth.ts",
+      "default": "./dist/auth.js"
+    },
+    "./chat": {
+      "types": "./src/chat.ts",
+      "default": "./dist/chat.js"
+    },
+    "./media": {
+      "types": "./src/media.ts",
+      "default": "./dist/media.js"
+    },
+    "./conversation": {
+      "types": "./src/conversation.ts",
+      "default": "./dist/conversation.js"
+    },
+    "./user": {
+      "types": "./src/user.ts",
+      "default": "./dist/user.js"
+    }
   },
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json --rewriteRelativeImportExtensions",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
