@@ -1,10 +1,10 @@
 /**
  * useChatStream — React hook wrapping ChatClient + local message state.
  *
- * Mirrors mobile-app's useChatStream (feat-130). The state machine is pure
- * React and platform-agnostic — the only platform-specific bit is which
- * ChatClient (and WebSocket-style socket) to construct, and that's handled
- * inside `ws-chat-client.ts`.
+ * Mirrors mobile-app's useChatStream (Session 024 + 130). The state machine
+ * is pure React and platform-agnostic — the only platform-specific bit is
+ * which ChatClient (and socket) to construct, and that's handled inside
+ * `ws-chat-client.ts`.
  *
  * State machine for an assistant turn:
  *   user-send → message.start (push empty assistant bubble) →
@@ -14,9 +14,16 @@
  * Tool calls are interleaved with deltas: a `tool.call` event opens a new
  * ToolCallItem attached to the current assistant bubble; the matching
  * `tool.result` (same tool_call_id) populates its `result` field.
+ *
+ * Multi-modal (feat-141):
+ *   User messages can carry an optional `media[]` of LocalMedia — local
+ *   preview URI plus the uploaded server URL. The hook forwards the wire
+ *   blocks to the WS and echoes the media alongside the text so the local
+ *   bubble can render images / video previews immediately.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { ContentBlock } from '@multimodal/api-contract';
 import type {
   MessageDeltaEvent,
   MessageDoneEvent,
@@ -41,8 +48,27 @@ export type ToolCallItem = {
   result: string | null;
 };
 
+/** Local media attachment — what the picker just produced. */
+export type LocalMedia = {
+  id: string;
+  /** Local temp file path from the picker (Taro.chooseMedia). */
+  localUri: string;
+  /** Server URL returned by POST /api/v1/media/upload. */
+  uploadedUrl: string;
+  mediaType: 'image' | 'video';
+  width: number;
+  height: number;
+};
+
 export type MessageItem =
-  | { id: string; kind: 'user'; content: string }
+  | {
+      id: string;
+      kind: 'user';
+      /** Caption text (may be empty when the message is media-only). */
+      text?: string;
+      /** Optional media attachments shown in the user bubble. */
+      media?: LocalMedia[];
+    }
   | {
       id: string;
       kind: 'assistant';
@@ -51,6 +77,11 @@ export type MessageItem =
       toolCalls: ToolCallItem[];
     }
   | { id: string; kind: 'error'; code: string; message: string };
+
+/** Hook-level send input — wire shape plus local media for the bubble echo. */
+export type SendInput = ChatMessageInput & {
+  media?: LocalMedia[];
+};
 
 export interface UseChatStreamOptions {
   /** Fully resolved WebSocket URL (e.g. resolveChatWsUrl(TARO_APP_API_BASE_URL)). */
@@ -65,7 +96,7 @@ export interface UseChatStreamResult {
   messages: MessageItem[];
   connectionState: ConnectionState;
   /** Push the user's turn and stream the assistant's reply. */
-  send: (input: ChatMessageInput[]) => void;
+  send: (input: SendInput[]) => void;
   /** True iff a request is in flight (the most-recent assistant bubble is streaming). */
   isStreaming: boolean;
   /** Disconnect and clear local state. */
@@ -76,6 +107,35 @@ let counter = 0;
 function nextId(prefix: string): string {
   counter += 1;
   return `${prefix}-${counter}`;
+}
+
+/** Extract the user-facing text caption from a ContentBlock[]. */
+function textFromBlocks(blocks: ContentBlock[]): string | undefined {
+  const texts = blocks
+    .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+    .map((b) => b.text);
+  if (texts.length === 0) return undefined;
+  return texts.join('\n');
+}
+
+/** Build the wire ContentBlock[] from a user send. Videos have no V1 block. */
+function blocksForUserSend(text: string | undefined, media: LocalMedia[] | undefined): ContentBlock[] {
+  const blocks: ContentBlock[] = [];
+  if (text !== undefined && text.trim().length > 0) {
+    blocks.push({ type: 'text', text: text.trim() });
+  }
+  for (const item of media ?? []) {
+    if (item.mediaType === 'image') {
+      blocks.push({ type: 'image_url', image_url: { url: item.uploadedUrl } });
+    }
+    // video: dropped from wire (no V1 video_url block — see api-contract/agent.ts V1 scope)
+  }
+  // Media-only send (e.g. video only): give the agent something to respond to.
+  if (blocks.length === 0 && (media?.length ?? 0) > 0) {
+    const hasVideo = (media ?? []).some((m) => m.mediaType === 'video');
+    blocks.push({ type: 'text', text: hasVideo ? '我发了一段视频' : '看看这个' });
+  }
+  return blocks;
 }
 
 export function useChatStream(options: UseChatStreamOptions): UseChatStreamResult {
@@ -101,8 +161,6 @@ export function useChatStream(options: UseChatStreamOptions): UseChatStreamResul
 
   const handleStart = useCallback(
     (event: MessageStartEvent) => {
-      // Server has begun streaming a turn — open a fresh assistant bubble
-      // keyed by the server-issued message_id (used by deltas / done / tool events).
       appendAssistant(event.message_id);
       setIsStreaming(true);
     },
@@ -218,15 +276,30 @@ export function useChatStream(options: UseChatStreamOptions): UseChatStreamResul
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  const send = useCallback((input: ChatMessageInput[]) => {
+  const send = useCallback((input: SendInput[]) => {
+    const first = input[0];
+    if (first === undefined) return;
+
     // 1. Echo the user turn locally so it shows up immediately.
     const userId = nextId('user');
+    const echoText =
+      typeof first.content === 'string' ? first.content : textFromBlocks(first.content);
     setMessages((prev) => [
       ...prev,
-      { id: userId, kind: 'user', content: input[0]?.content ?? '' },
+      { id: userId, kind: 'user', text: echoText, media: first.media },
     ]);
-    // 2. Hand off to the server.
-    clientRef.current?.send({ messages: input });
+
+    // 2. Build the wire payload. Multi-modal users get ContentBlock[]; pure
+    //    text users keep the V1 string wire shape (server's _to_langchain
+    //    handles both — see session-handoff.md).
+    let wireContent: string | ContentBlock[];
+    if (first.media !== undefined && first.media.length > 0) {
+      wireContent = blocksForUserSend(echoText, first.media);
+    } else {
+      wireContent = typeof first.content === 'string' ? first.content : (echoText ?? '');
+    }
+
+    clientRef.current?.send({ messages: [{ role: first.role, content: wireContent }] });
   }, []);
 
   const reset = useCallback(() => {

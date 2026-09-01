@@ -3,6 +3,12 @@ import TsconfigPathsPlugin from 'tsconfig-paths-webpack-plugin'
 import devConfig from './dev'
 import prodConfig from './prod'
 
+// Workspace TS packages (`packages/api-contract`) are built to `dist/` via
+// `tsc -p tsconfig.build.json --rewriteRelativeImportExtensions` and the
+// built `main: dist/index.js` is what Taro's webpack reads. The build
+// step is wired via `mini-program`'s `prebuild` script in package.json —
+// no runtime config needed here.
+
 // https://taro-docs.jd.com/docs/next/config#defineconfig-辅助函数
 export default defineConfig<'webpack5'>(async (merge, _args) => {
   // @tarojs/plugin-mock starts a sidecar mock server on :9527 that the WeChat dev tools

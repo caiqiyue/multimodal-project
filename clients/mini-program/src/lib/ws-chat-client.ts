@@ -25,10 +25,12 @@ import type {
   ToolCallEvent,
   ToolResultEvent,
 } from '@multimodal/chat-protocol';
+import type { ContentBlock } from '@multimodal/api-contract';
 
 export type ChatMessageInput = {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  /** V1 backward compat: plain string. V2: ContentBlock[] for multi-modal. */
+  content: string | ContentBlock[];
 };
 
 export interface ChatClientCallbacks {
