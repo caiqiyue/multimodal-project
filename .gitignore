@@ -434,3 +434,102 @@ src/mocks/browser.js
 # ============================================================
 docs/id_ed25519
 docs/id_ed25519.pub
+
+# ============================================================
+# 第二十一优先级：测试 + Roundtrip media 防御（防止 test 文件意外入仓）
+# 备注：当前 /tmp/feat033-media/* 在 Mac /tmp 下不在仓里；这些模式防未来误放
+# ============================================================
+test-red.jpg
+test-blue.jpg
+test-green.jpg
+test-video.mp4
+roundtrip-*.jpg
+roundtrip-*.mp4
+roundtrip-*.png
+*.test.jpg
+*.test.png
+*.test.mp4
+*.roundtrip.jpg
+*.roundtrip.mp4
+
+# ============================================================
+# 第二十二优先级：env / dotenv 完整覆盖（direnv / docker / k8s 等场景）
+# ============================================================
+.envrc
+.env.*.local
+*.env.local
+# 已知 .env.* 类型（已覆盖）+ .envrc + .env.*.local + *.env.local
+
+# ============================================================
+# 第二十三优先级：Python build / cache 完整覆盖
+# 备注：__pycache__/ 已在第十一优先级；这里补 *.pyc / *.pyo 单文件 + egg-info + .mypy_cache
+# ============================================================
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+*.egg
+build/
+dist/
+
+# ============================================================
+# 第二十四优先级：日志文件（evidence/ 已在第一优先级整体忽略，无需例外）
+# ============================================================
+*.log
+*.log.*
+logs/
+/logs/
+*.pid
+
+# ============================================================
+# 第二十五优先级：测试覆盖率 / report 输出
+# ============================================================
+coverage/
+htmlcov/
+.nyc_output/
+*.lcov
+*.gcov
+
+# ============================================================
+# 第二十六优先级：临时 / scratch 文件
+# ============================================================
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+.fseventsd/
+.Spotlight-V100/
+.Trashes/
+
+# ============================================================
+# 第二十七优先级：iOS / Android build artifacts 完整覆盖
+# ============================================================
+# iOS (Expo + bare workflow)
+ios/Pods/
+ios/build/
+ios/.xcode.env.local
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+DerivedData/
+*.ipa
+*.app.dSYM.zip
+*.dSYM
+
+# Android (Expo)
+android/build/
+android/.gradle/
+android/local.properties
+android/app/build/
+android/.idea/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
