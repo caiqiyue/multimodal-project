@@ -12,6 +12,19 @@
 
 `multimodal-project` 是一个**学习为主 / 全栈交付**的项目，目标是跑通"训练 → 推理 → 服务 → 上线"的完整链路：
 
+### 1.1 🎯 本项目的最终目的（面向面试的作品集，2026-09-02 用户再次确认）
+
+**这是一个 portfolio piece，不是普通 Demo。** 核心目的是向面试官展示两个能力支柱，**二者并重，缺一不可**：
+
+| 能力支柱 | 含义 | 当前 V1 进度 |
+|---------|------|-------------|
+| **(1) 多模态模型训练能力** | Qwen3-VL 部署 + LoRA SFT + Image GRPO + 训练数据来源 / 指标 / 训练过程文档化 | 部署已 passing（feat-002）；训练执行仍冻结（GPU 受限）但数据已就位（Session 004 ~22GB） |
+| **(2) 移动端开发能力** | Mobile App（RN + Expo + TS）+ 微信小程序（Taro + TS）双客户端，组成完整产品工程 | 已 100% passing（feat-130 + feat-131 + feat-033 + feat-141） |
+
+**当前 V1 执行范围仍是 Chat demo**，但任何 session 做范围决策时，必须以 **"两个能力支柱最终都能向面试官展示出来"** 作为第一原则。
+
+> Ground truth 见 `/Users/apple/.claude/projects/-Users-apple-Desktop-multimodal-llm/memory/falcon-core-goal.md`（持久化 memory）。
+
 1. **训练侧**：在 Qwen3-VL-2B-Instruct 基础上，用 LoRA 做 SFT，再做 Image GRPO（避开开放式 caption RL 这种不稳的任务），最后 merge 出最终模型。
 2. **推理侧**：用 vLLM 起 OpenAI-compatible API，启用 prefix caching，对并发/吞吐/TTFT/TPOT 做系统性 benchmark。
 3. **Agent 侧**：用 LangGraph 把 vLLM 包装成 Agent，加 calculator + server_info 两个 tool。
