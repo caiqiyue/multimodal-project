@@ -305,7 +305,7 @@ def test_to_langchain_rejects_empty_block_list_with_422(client):
 
 def test_to_langchain_rejects_too_many_blocks_with_422(client):
     """More than MAX_BLOCKS_PER_MESSAGE blocks must 422."""
-    from backend.app.api.agent import MAX_BLOCKS_PER_MESSAGE
+    from backend.app.schemas.agent import MAX_BLOCKS_PER_MESSAGE
 
     blocks = [{"type": "text", "text": f"block {i}"} for i in range(MAX_BLOCKS_PER_MESSAGE + 1)]
     r = client.post(
