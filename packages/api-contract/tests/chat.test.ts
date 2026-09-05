@@ -51,4 +51,66 @@ describe('chat schemas', () => {
     });
     expect(result.success).toBe(false);
   });
+
+  // ===== V2 widening: text-only string content (V1 backward compat path) =====
+  //
+  // After feat-026 (WS schema sync), ChatMessageSchema.content accepts BOTH a
+  // plain string (V1 path) AND a ContentBlock[] (V2 path). The HTTP /agent/invoke
+  // endpoint has been dual-form since Session 023 (AgentChatMessageSchema);
+  // the WS schema only landed this change when feat-033 + feat-141 began
+  // sending ContentBlock[] from mobile-app + mini-program respectively.
+
+  it('accepts text-only string content (V1 backward compat)', () => {
+    const result = ChatStreamRequestSchema.safeParse({
+      conversation_id: 'conv_1',
+      message: { role: 'user', content: '你好' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.message.content).toBe('你好');
+    }
+  });
+
+  it('accepts long text-only string at the 32k boundary', () => {
+    const longText = 'a'.repeat(32_000);
+    const result = ChatStreamRequestSchema.safeParse({
+      conversation_id: 'conv_1',
+      message: { role: 'user', content: longText },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects text-only string over 32k chars', () => {
+    const tooLong = 'a'.repeat(32_001);
+    const result = ChatStreamRequestSchema.safeParse({
+      conversation_id: 'conv_1',
+      message: { role: 'user', content: tooLong },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty string content (min 1 char)', () => {
+    const result = ChatStreamRequestSchema.safeParse({
+      conversation_id: 'conv_1',
+      message: { role: 'user', content: '' },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty array content (boundary preserved)', () => {
+    const result = ChatStreamRequestSchema.safeParse({
+      conversation_id: 'conv_1',
+      message: { role: 'user', content: [] },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects array content with > 16 blocks (Qwen3-VL practical cap)', () => {
+    const blocks = Array.from({ length: 17 }, () => ({ type: 'text', text: 'x' }));
+    const result = ChatStreamRequestSchema.safeParse({
+      conversation_id: 'conv_1',
+      message: { role: 'user', content: blocks },
+    });
+    expect(result.success).toBe(false);
+  });
 });

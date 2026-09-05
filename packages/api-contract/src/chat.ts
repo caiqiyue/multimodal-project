@@ -23,14 +23,24 @@ export type {
   MessageRole,
 } from './agent.ts';
 
-// WS-flavoured ChatMessage: in V1 the WS stream only accepts plain text;
-// V2 (feat-033+ mini-program coordination) will widen content to the same
-// union the HTTP endpoint exposes. Keeping the schema here narrower than
-// AgentChatMessageSchema avoids forcing a wire-contract bump on existing WS
-// clients until the V2 plan lands.
+// WS-flavoured ChatMessage: V2 widening landed with feat-033 + feat-141
+// (mobile-app + mini-program pickers send ContentBlock[] over WS). The schema
+// here now mirrors AgentChatMessageSchema's union — text-only string (V1
+// backward-compat path) OR ContentBlock[] (V2 multi-modal path). The backend
+// WS endpoint (`backend/app/api/ws_chat.py`) does not validate the schema;
+// it forwards whatever JSON the client sends straight to the agent, where
+// `_to_langchain` dispatches on shape (str → HumanMessage(str),
+// list → HumanMessage([...])).
+//
+// Bounds match AgentChatMessageSchema exactly so HTTP and WS stay in lockstep:
+//   - string: 1..32_000 chars (matches AgentChatMessageSchema; caps malicious payloads)
+//   - array: 1..16 blocks (Qwen3-VL practical limit; V1 agent.ts scope)
 export const ChatMessageSchema = z.object({
   role: MessageRoleSchema,
-  content: z.array(ContentBlockSchema).min(1),
+  content: z.union([
+    z.string().min(1).max(32_000),
+    z.array(ContentBlockSchema).min(1).max(16),
+  ]),
 });
 export type ChatMessage = z.infer<typeof ChatMessageSchema>;
 
