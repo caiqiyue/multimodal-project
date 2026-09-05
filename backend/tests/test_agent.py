@@ -52,6 +52,14 @@ def stub_agent(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     """Patch the cached compiled agent with an in-process stub."""
     graph_module.reset_agent()
     stub = _build_stub_agent()
+    # api/agent.py does `from backend.app.agent import get_agent` at import
+    # time — so we patch the consumer's module binding directly (string
+    # monkeypatch fails with AttributeError for module-level imports; the
+    # canonical pytest pattern is to import the module object and patch
+    # that).
+    import backend.app.api.agent as api_agent_module
+    monkeypatch.setattr(api_agent_module, "get_agent", lambda: stub)
+    # Also patch graph._agent for callers that still resolve graph.get_agent().
     monkeypatch.setattr(graph_module, "_agent", stub, raising=True)
     yield stub
     graph_module.reset_agent()

@@ -199,20 +199,26 @@ def test_echo_agent_invoke_accepts_real_langchain_messages():
     assert "demo mode" in reply
 
 
-@pytest.mark.asyncio
-async def test_echo_agent_astream_events_yields_chat_model_stream():
+def test_echo_agent_astream_events_yields_chat_model_stream():
     """ws_chat.py's _stream_turn() awaits agent.astream_events(...). Demo
     agent must yield at least one on_chat_model_stream event whose chunk
-    has a .content attribute carrying the reply text."""
+    has a .content attribute carrying the reply text.
+
+    Uses asyncio.run() instead of pytest-asyncio so the test suite
+    doesn't need an extra plugin.
+    """
     import asyncio
 
     agent = EchoAgent()
     msgs = [ChatMessage(role="user", content="stream test")]
 
-    events = []
-    async for event in agent.astream_events({"messages": msgs}, version="v2"):
-        events.append(event)
+    async def collect():
+        events = []
+        async for event in agent.astream_events({"messages": msgs}, version="v2"):
+            events.append(event)
+        return events
 
+    events = asyncio.run(collect())
     assert len(events) >= 1
     chat_stream_events = [e for e in events if e["event"] == "on_chat_model_stream"]
     assert len(chat_stream_events) == 1
