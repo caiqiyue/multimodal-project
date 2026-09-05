@@ -115,13 +115,17 @@ def _build_tool_stub_agent():
 def simple_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     graph_module.reset_agent()
     stub = _build_simple_stub_agent()
-    # Patch the consumer modules (api/agent.py + api/ws_chat.py do
-    # `from backend.app.agent import get_agent`, which binds get_agent in
-    # the consumer's namespace at import time — so we have to patch the
-    # consumer's binding, not the dispatcher's). Also patch graph._agent
-    # for callers that still resolve graph.get_agent() directly.
-    monkeypatch.setattr("backend.app.api.agent", "get_agent", lambda: stub)
-    monkeypatch.setattr("backend.app.api.ws_chat", "get_agent", lambda: stub)
+    # api/agent.py + api/ws_chat.py do `from backend.app.agent import
+    # get_agent`, which binds get_agent in the consumer's namespace at
+    # import time — so we patch each consumer's module object directly
+    # (the canonical pytest monkeypatch pattern) instead of going through
+    # the dispatcher's namespace.
+    import backend.app.api.agent as api_agent_module
+    import backend.app.api.ws_chat as api_ws_chat_module
+    monkeypatch.setattr(api_agent_module, "get_agent", lambda: stub)
+    monkeypatch.setattr(api_ws_chat_module, "get_agent", lambda: stub)
+    # Also patch graph._agent for any caller that still resolves
+    # graph.get_agent() directly.
     monkeypatch.setattr(graph_module, "_agent", stub)
     yield stub
     graph_module.reset_agent()
@@ -131,8 +135,10 @@ def simple_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
 def tool_stub(monkeypatch: pytest.MonkeyPatch) -> Iterator[object]:
     graph_module.reset_agent()
     stub = _build_tool_stub_agent()
-    monkeypatch.setattr("backend.app.api.agent", "get_agent", lambda: stub)
-    monkeypatch.setattr("backend.app.api.ws_chat", "get_agent", lambda: stub)
+    import backend.app.api.agent as api_agent_module
+    import backend.app.api.ws_chat as api_ws_chat_module
+    monkeypatch.setattr(api_agent_module, "get_agent", lambda: stub)
+    monkeypatch.setattr(api_ws_chat_module, "get_agent", lambda: stub)
     monkeypatch.setattr(graph_module, "_agent", stub)
     yield stub
     graph_module.reset_agent()
