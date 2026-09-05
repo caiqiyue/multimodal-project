@@ -23,7 +23,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import ValidationError
 
-from backend.app.agent.graph import get_agent
+from backend.app.agent import get_agent
 from backend.app.schemas.agent import AgentInvokeRequest, ChatMessage
 
 

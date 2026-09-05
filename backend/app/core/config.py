@@ -9,6 +9,7 @@ Reference: docs/SECURITY.md §1.4 (server .env), pydantic-settings v2 docs.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -66,6 +67,14 @@ class Settings(BaseSettings):
     # /var/lib/multimodal/media. The directory is created on first upload.
     media_data_root: str = "data/media"
     media_public_base_url: str = "/api/v1/media"
+
+    # Agent backend mode (feat-027, Session 029).
+    # 'demo' — context-aware echo, no vLLM dependency. Use when GPU is busy
+    #          or for portfolio demos; client UI still renders coherent text.
+    # 'real' — LangGraph agent calling vLLM. Requires vLLM serving.
+    # Default 'demo' because vLLM is currently OFF (GPU 1 A6000 busy since
+    # 2026-08-31). Flip via `AGENT_MODE=real` env var when vLLM is back.
+    agent_mode: Literal["demo", "real"] = "demo"
 
 
 @lru_cache(maxsize=1)

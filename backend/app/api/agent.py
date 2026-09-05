@@ -24,7 +24,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from backend.app.agent.graph import get_agent
+from backend.app.agent import get_agent
 from backend.app.schemas.agent import (
     AgentInvokeRequest,
     AgentInvokeResponse,
