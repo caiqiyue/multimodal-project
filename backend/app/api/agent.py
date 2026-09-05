@@ -29,7 +29,8 @@ from backend.app.schemas.agent import (
     AgentInvokeRequest,
     AgentInvokeResponse,
     ChatMessage,
-    ContentBlock,
+    ContentShapeError,
+    blocks_to_lc_content,
 )
 
 
@@ -37,52 +38,6 @@ logger = logging.getLogger(__name__)
 
 
 router = APIRouter(prefix="/agent", tags=["agent"])
-
-
-# Hard cap on blocks per message — vLLM Qwen3-VL is well-behaved up to 16.
-# Anything above this is almost certainly a misuse.
-MAX_BLOCKS_PER_MESSAGE = 16
-
-
-class ContentShapeError(ValueError):
-    """Raised when a ContentBlock list fails structural validation."""
-
-
-def _blocks_to_lc_content(blocks: list[ContentBlock]) -> list[dict[str, Any]]:
-    """Convert our Pydantic ContentBlock list to the dict shape LangChain /
-    langchain-openai pass to vLLM's OpenAI-compat endpoint.
-
-    Output shape (per OpenAI spec for multi-modal chat completions):
-        [
-          {"type": "text",      "text": "..."},
-          {"type": "image_url", "image_url": {"url": "...", "detail": "..."}},
-        ]
-
-    We keep the dict shape (rather than re-instantiating LangChain content
-    block classes) so the wire payload is round-trippable and easy to log.
-    """
-    if not 1 <= len(blocks) <= MAX_BLOCKS_PER_MESSAGE:
-        raise ContentShapeError(
-            f"content block list must have 1..{MAX_BLOCKS_PER_MESSAGE} blocks "
-            f"(got {len(blocks)})"
-        )
-    out: list[dict[str, Any]] = []
-    for b in blocks:
-        # Pydantic v2 discriminated union hands us the right subclass instance,
-        # so we can switch on `type` (which is a Literal field, so .type is fine).
-        if b.type == "text":
-            out.append({"type": "text", "text": b.text})  # type: ignore[attr-defined]
-        elif b.type == "image_url":
-            # model_dump(exclude_none=True) keeps the wire payload clean —
-            # `detail: None` would just add noise and the OpenAI spec marks
-            # `detail` as optional (so omitting is the canonical shape).
-            out.append({
-                "type": "image_url",
-                "image_url": b.image_url.model_dump(exclude_none=True),  # type: ignore[attr-defined]
-            })
-        else:  # defensive — discriminator should prevent this branch
-            raise ContentShapeError(f"unsupported content block type: {b.type}")
-    return out
 
 
 def _to_langchain(messages: list[ChatMessage]) -> list:
@@ -99,7 +54,7 @@ def _to_langchain(messages: list[ChatMessage]) -> list:
             lc_content: Any = m.content
         else:
             try:
-                lc_content = _blocks_to_lc_content(m.content)
+                lc_content = blocks_to_lc_content(m.content)
             except ContentShapeError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

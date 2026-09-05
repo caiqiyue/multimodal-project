@@ -24,7 +24,12 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import ValidationError
 
 from backend.app.agent import get_agent
-from backend.app.schemas.agent import AgentInvokeRequest, ChatMessage
+from backend.app.schemas.agent import (
+    AgentInvokeRequest,
+    ChatMessage,
+    ContentShapeError,
+    blocks_to_lc_content,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -50,18 +55,33 @@ def _envelope(conversation_id: str) -> dict[str, str | int]:
 def _to_langchain(messages: list[ChatMessage]) -> list:
     """Coerce wire-format ChatMessage list to LangChain message objects.
 
-    Kept local (not imported from agent.py) so this router has no implicit
-    dependency on the sync /agent/invoke endpoint's internals — both routers
-    can evolve independently as long as the wire shape matches.
+    V1 path: `content: str` → HumanMessage(content=str).
+    V2 path: `content: list[ContentBlock]` → HumanMessage(content=[dict, dict])
+    (LangChain's HumanMessage rejects raw Pydantic objects — needs the
+    OpenAI-spec dict shape. The conversion lives in
+    `backend.app.schemas.agent.blocks_to_lc_content` so both this router
+    and the sync /agent/invoke endpoint share the same coercion + the
+    same 1..16 block cap.)
+
+    On shape error we raise the structured ``ContentShapeError``; the
+    caller wraps it as a wire ``error`` event so the client sees a
+    well-formed terminal.
     """
     out: list = []
     for m in messages:
+        if isinstance(m.content, str):
+            lc_content = m.content
+        else:
+            # Raises ContentShapeError if block count is out of [1, 16];
+            # caller emits a wire error event and the connection stays open.
+            lc_content = blocks_to_lc_content(m.content)
+
         if m.role == "user":
-            out.append(HumanMessage(content=m.content))
+            out.append(HumanMessage(content=lc_content))
         elif m.role == "assistant":
-            out.append(AIMessage(content=m.content))
+            out.append(AIMessage(content=lc_content))
         else:  # "system" — already validated by the regex in ChatMessage
-            out.append(SystemMessage(content=m.content))
+            out.append(SystemMessage(content=lc_content))
     return out
 
 
