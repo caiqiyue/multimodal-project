@@ -21,6 +21,10 @@ evidence/
 docs/ARCHITECTURE.md
 docs/SECURITY.md
 docs/harness机制.md
+
+# understand-anything harness 生成的知识图谱（local-only artifact，
+# 类似 evidence/：每个 session 都可重建，不入 Git）
+.understand-anything/
 # 注：项目总执行计划.md / 服务器运维手册.md 是项目文档，**入 Git**
 # 它们不含密钥，是给所有协作者看的（harness 文档是给 AI agent 用的，性质不同）
 
