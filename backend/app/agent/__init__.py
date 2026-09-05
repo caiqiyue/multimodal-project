@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from backend.app.agent.echo_agent import EchoAgent
 from backend.app.agent.graph import get_agent as _get_real_agent
-from backend.app.core.config import settings
+from backend.app.core.config import get_settings
 
 
 def get_agent():
@@ -24,7 +24,7 @@ def get_agent():
     ops can flip ``AGENT_MODE`` env var and restart uvicorn to switch backends
     without code changes.
     """
-    if settings.agent_mode == "demo":
+    if get_settings().agent_mode == "demo":
         return EchoAgent()
     return _get_real_agent()
 
