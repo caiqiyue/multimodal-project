@@ -13,6 +13,14 @@
  *    (`onMessageDelta`, `onToolCall`, …) by event type.
  *  - Surface connection lifecycle via `onConnectionOpen` / `onConnectionClose`.
  *
+ * Wire format: `ChatMessageInput.content` is a plain string (V1 path,
+ * text-only) OR a ContentBlock[] (V2 path, multi-modal). The authoritative
+ * schema is `ChatMessageSchema.content` in `@multimodal/api-contract`
+ * (Zod union landed in feat-026: `z.union([z.string().min(1).max(32_000),
+ * z.array(ContentBlockSchema).min(1).max(16)])`). The backend WS endpoint
+ * does not validate the shape — it forwards whatever JSON the client sends
+ * straight to the agent, where `_to_langchain` dispatches on shape.
+ *
  * Reference: docs/项目总执行计划.md §24, feature_list.json feat-021 + feat-131.
  */
 import Taro from '@tarojs/taro';

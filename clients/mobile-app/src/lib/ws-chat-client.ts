@@ -9,10 +9,13 @@
  *   buttons while disconnected.
  *
  * Wire format: `content` may be a plain string (V1 path, text-only) OR a
- * ContentBlock[] (V2 path, multi-modal). The backend WS endpoint does not
- * validate the shape — it forwards whatever JSON the client sends straight
- * to the agent, where `_to_langchain` dispatches on shape. See
- * backend/app/agent/_to_langchain.py + session-handoff.md.
+ * ContentBlock[] (V2 path, multi-modal). The authoritative schema is
+ * `ChatMessageSchema.content` in `@multimodal/api-contract/chat` (Zod union
+ * landed in feat-026: `z.union([z.string().min(1).max(32_000),
+ * z.array(ContentBlockSchema).min(1).max(16)])`). The backend WS endpoint
+ * does not validate the shape — it forwards whatever JSON the client sends
+ * straight to the agent, where `_to_langchain` dispatches on shape. See
+ * backend/app/agent/_to_langchain.py + packages/api-contract/src/chat.ts.
  *
  * Reference: docs/项目总执行计划.md §24, feature_list.json feat-021 + feat-130.
  */
