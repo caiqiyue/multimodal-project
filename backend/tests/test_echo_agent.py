@@ -20,7 +20,12 @@ from __future__ import annotations
 import pytest
 
 from backend.app.agent.echo_agent import EchoAgent, _build_reply_text
-from backend.app.schemas.agent import ChatMessage, ContentBlock, ImageUrlPayload
+from backend.app.schemas.agent import (
+    ChatMessage,
+    ImageUrlContentBlock,
+    ImageUrlPayload,
+    TextContentBlock,
+)
 
 
 # ===== _build_reply_text: pure function coverage =====
@@ -40,7 +45,7 @@ def test_build_reply_text_text_only_array():
     msgs = [
         ChatMessage(
             role="user",
-            content=[ContentBlock(type="text", text="hello array")],
+            content=[TextContentBlock(type="text", text="hello array")],
         )
     ]
     reply = _build_reply_text(msgs)
@@ -54,8 +59,8 @@ def test_build_reply_text_with_image_url():
         ChatMessage(
             role="user",
             content=[
-                ContentBlock(type="text", text="看这张图"),
-                ContentBlock(
+                TextContentBlock(type="text", text="看这张图"),
+                ImageUrlContentBlock(
                     type="image_url",
                     image_url=ImageUrlPayload(url="http://x/y.jpg"),
                 ),
@@ -74,9 +79,9 @@ def test_build_reply_text_only_images_no_text():
         ChatMessage(
             role="user",
             content=[
-                ContentBlock(type="image_url", image_url=ImageUrlPayload(url="http://x/1.jpg")),
-                ContentBlock(type="image_url", image_url=ImageUrlPayload(url="http://x/2.jpg")),
-                ContentBlock(type="image_url", image_url=ImageUrlPayload(url="http://x/3.jpg")),
+                ImageUrlContentBlock(type="image_url", image_url=ImageUrlPayload(url="http://x/1.jpg")),
+                ImageUrlContentBlock(type="image_url", image_url=ImageUrlPayload(url="http://x/2.jpg")),
+                ImageUrlContentBlock(type="image_url", image_url=ImageUrlPayload(url="http://x/3.jpg")),
             ],
         )
     ]
@@ -225,8 +230,8 @@ def test_echo_agent_invoke_handles_content_block_list():
         ChatMessage(
             role="user",
             content=[
-                ContentBlock(type="text", text="what color"),
-                ContentBlock(
+                TextContentBlock(type="text", text="what color"),
+                ImageUrlContentBlock(
                     type="image_url",
                     image_url=ImageUrlPayload(url="http://x/red.jpg"),
                 ),
