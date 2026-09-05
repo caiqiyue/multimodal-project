@@ -120,6 +120,49 @@ def test_build_reply_text_picks_last_user_message():
     assert "first question" not in reply
 
 
+# ===== Real-caller path: api/agent.py passes LangChain messages after _to_langchain =====
+
+
+def test_build_reply_text_accepts_langchain_messages():
+    """Real callers in api/agent.py + api/ws_chat.py convert ChatMessage
+    → LangChain HumanMessage/AIMessage/SystemMessage via _to_langchain
+    BEFORE calling agent.invoke(). Demo agent must accept the LangChain
+    shape, not just Pydantic ChatMessage.
+
+    LangChain messages have `.type` ('human'/'ai'/'system'), not `.role`.
+    """
+    from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+    msgs = [
+        SystemMessage(content="system prompt"),
+        HumanMessage(content="first user"),
+        AIMessage(content="first ai"),
+        HumanMessage(content="second user via langchain"),
+    ]
+    reply = _build_reply_text(msgs)
+    assert "demo mode" in reply
+    assert "second user via langchain" in reply
+    assert "first user" not in reply
+
+
+def test_build_reply_text_langchain_multimodal_content():
+    """LangChain multi-modal HumanMessage.content is a list of dicts
+    (OpenAI spec shape) — not Pydantic ContentBlock instances. Demo
+    agent must handle both dicts and objects.
+    """
+    from langchain_core.messages import HumanMessage
+    msgs = [
+        HumanMessage(content=[
+            {"type": "text", "text": "langchain multi-modal"},
+            {"type": "image_url", "image_url": {"url": "http://x/img.jpg"}},
+            {"type": "image_url", "image_url": {"url": "http://x/img2.jpg"}},
+        ])
+    ]
+    reply = _build_reply_text(msgs)
+    assert "demo mode" in reply
+    assert "2 张图片" in reply
+    assert "langchain multi-modal" in reply
+
+
 # ===== EchoAgent class: same interface as real LangGraph agent =====
 
 

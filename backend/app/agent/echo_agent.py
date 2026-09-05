@@ -48,42 +48,82 @@ TEXT_SNIPPET_CAP = 100  # how much user text to surface in the echo reply
 # === Pure helper: build the reply text ===
 
 
-def _build_reply_text(messages: list[ChatMessage]) -> str:
+def _get_role(m: Any) -> str | None:
+    """Normalize role across Pydantic ChatMessage + LangChain message types.
+
+    - Pydantic ChatMessage: ``.role`` is ``Literal['user','assistant','system']``.
+    - LangChain messages: ``.type`` is ``'human' | 'ai' | 'system' | 'tool'``
+      (HumanMessage / AIMessage / SystemMessage / ToolMessage).
+    """
+    role = getattr(m, "role", None)
+    if role in ("user", "assistant", "system"):
+        return role
+    t = getattr(m, "type", None)
+    if t == "human":
+        return "user"
+    if t == "ai":
+        return "assistant"
+    if t in ("system", "tool"):
+        return t
+    return None
+
+
+def _extract_text_and_image_counts(content: Any) -> tuple[list[str], int]:
+    """Pull text snippets + image_url count from either ChatMessage.content
+    (str | list[ContentBlock]) or LangChain HumanMessage.content
+    (str | list[dict]).
+
+    Returns ``(text_parts, image_count)``.
+    """
+    if isinstance(content, str):
+        return ([content] if content else []), 0
+    if not isinstance(content, list):
+        return [], 0
+
+    text_parts: list[str] = []
+    image_count = 0
+    for item in content:
+        # ContentBlock (Pydantic) — attribute access
+        # dict (LangChain multi-modal) — key access
+        if isinstance(item, dict):
+            item_type = item.get("type")
+            if item_type == "text":
+                text_parts.append(item.get("text", ""))
+            elif item_type == "image_url":
+                image_count += 1
+        else:
+            item_type = getattr(item, "type", None)
+            if item_type == "text":
+                text_parts.append(getattr(item, "text", ""))
+            elif item_type == "image_url":
+                image_count += 1
+            # unknown block type — skip (matches real LangChain tolerance)
+    return text_parts, image_count
+
+
+def _build_reply_text(messages: list[Any]) -> str:
     """Compose a short Chinese-language reply describing the last user turn.
 
     Picks the last user-role message (matches real-agent behaviour — only
-    the latest user turn matters). Handles both V1 `content: str` and V2
-    `content: list[ContentBlock]` shapes (feat-026 widening, Session 028).
+    the latest user turn matters). Accepts either:
+      - Pydantic ChatMessage (wire format — used by direct unit tests)
+      - LangChain HumanMessage / AIMessage / SystemMessage (what the real
+        routers pass after ``_to_langchain`` has coerced the wire format)
+
+    Handles both V1 ``content: str`` and V2 ``content: list[ContentBlock]``
+    shapes (feat-026 widening, Session 028).
     """
-    last_user = next((m for m in reversed(messages) if m.role == "user"), None)
+    last_user = next(
+        (m for m in reversed(messages) if _get_role(m) == "user"), None
+    )
     if last_user is None:
         return f"{DEMO_PREFIX}消息（无可回应的用户轮次））"
 
-    content = last_user.content
-
-    # V1 path: plain string
-    if isinstance(content, str):
-        return f"{DEMO_PREFIX}文字消息：{content[:TEXT_SNIPPET_CAP]}）"
-
-    # V2 path: list[ContentBlock]
-    text_parts: list[str] = []
-    image_count = 0
-    for block in content:
-        # Discriminated union — `type` is a Literal field on both branches
-        # so `b.type` is the discriminator; the inner attribute access uses
-        # getattr to keep static-checkers quiet about union narrowing.
-        block_type = getattr(block, "type", None)
-        if block_type == "text":
-            text_parts.append(getattr(block, "text", ""))
-        elif block_type == "image_url":
-            image_count += 1
-
+    text_parts, image_count = _extract_text_and_image_counts(last_user.content)
     text_summary = text_parts[0][:TEXT_SNIPPET_CAP] if text_parts else ""
 
     if image_count and text_summary:
-        return (
-            f"{DEMO_PREFIX}{image_count} 张图片和文字：{text_summary}）"
-        )
+        return f"{DEMO_PREFIX}{image_count} 张图片和文字：{text_summary}）"
     if image_count:
         return f"{DEMO_PREFIX}{image_count} 张图片）"
     if text_summary:
