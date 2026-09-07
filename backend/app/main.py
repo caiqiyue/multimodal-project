@@ -43,6 +43,8 @@ async def lifespan(app: FastAPI):
         settings.host,
         settings.port,
     )
+    # DEBUG: confirm middleware registration on session 034 startup
+    print("[DEBUG startup] middleware stack:", app.user_middleware, flush=True)
     yield
     logger.info("Stopping multimodal-backend")
 
@@ -69,6 +71,28 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # DEBUG middleware — Session 034. Logs ONLY (a) whether Authorization
+    # header is present, (b) its length, (c) header names for visibility —
+    # never the token value itself (FastAPI security rules + GDPR-style
+    # redaction discipline). Revert after root cause identified.
+    import logging as _logging
+
+    _debug_logger = _logging.getLogger("uvicorn.error")
+
+    @app.middleware("http")
+    async def _debug_all_http(request, call_next):
+        # DEBUG: log ALL requests to confirm middleware is wired up.
+        auth_present = "authorization" in {k.lower() for k in request.headers.keys()}
+        auth_len = len(request.headers.get("authorization", ""))
+        header_names = sorted({k for k in request.headers.keys()})
+        print(
+            f"[DEBUG all-http] {request.method} {request.url.path} "
+            f"auth_present={auth_present} auth_len={auth_len} "
+            f"headers={header_names}",
+            flush=True,
+        )
+        return await call_next(request)
 
     # Banner + health (feat-016)
     app.include_router(health.router)
