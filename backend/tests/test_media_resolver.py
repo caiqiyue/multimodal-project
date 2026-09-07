@@ -71,7 +71,7 @@ def test_external_url_passes_through_unchanged():
 def test_relative_url_is_fetched_and_inlined(monkeypatch):
     captured: dict = {}
 
-    def fake_get(self, url: str):  # noqa: ARG001
+    async def fake_get(self, url: str):  # noqa: ARG001
         captured["url"] = url
         return _FakeResp(b"fake-jpeg-bytes", "image/jpeg")
 
@@ -90,7 +90,7 @@ def test_same_origin_absolute_url_is_also_inlined(monkeypatch):
     """An absolute URL pointing at our own backend still needs inlining
     because vLLM's fetch would hit the same event loop we're blocking."""
 
-    def fake_get(self, url: str):  # noqa: ARG001
+    async def fake_get(self, url: str):  # noqa: ARG001
         return _FakeResp(b"\x89PNG\r\n\x1a\n", "image/png")
 
     monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
@@ -105,7 +105,7 @@ def test_fetch_failure_passes_block_through(monkeypatch):
     """If the fetch fails, return the original block — better to let
     vLLM try (and surface its own error) than 422 the user."""
 
-    def fake_get(self, url: str):  # noqa: ARG001
+    async def fake_get(self, url: str):  # noqa: ARG001
         raise RuntimeError("connection refused")
 
     monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
@@ -125,7 +125,7 @@ def test_inline_chat_message_media_skips_str_content():
 
 
 def test_inline_chat_message_media_handles_mixed_blocks(monkeypatch):
-    def fake_get(self, url: str):  # noqa: ARG001
+    async def fake_get(self, url: str):  # noqa: ARG001
         return _FakeResp(b"x", "image/png")
 
     monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
@@ -149,7 +149,7 @@ def test_inline_chat_message_media_handles_mixed_blocks(monkeypatch):
 def test_inline_chat_message_media_does_not_mutate_input(monkeypatch):
     """The resolver must return a new list — input messages stay intact."""
 
-    def fake_get(self, url: str):  # noqa: ARG001
+    async def fake_get(self, url: str):  # noqa: ARG001
         return _FakeResp(b"x", "image/jpeg")
 
     monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
