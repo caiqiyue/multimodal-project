@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: falcon-web-backend
+
+falcon:
+  upstream:
+    base-url: http://127.0.0.1:9000
+    ws-path: /api/v1/ws/chat
+    health-path: /health
+    connect-timeout-ms: 3000
+    read-timeout-ms: 10000
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+
+logging:
+  level:
+    com.falcon.web: INFO
