@@ -5,6 +5,7 @@ import {
   setCurrentUser,
   setTokens,
 } from './tokenStorage';
+import { taroFetch } from './taroFetch';
 
 // Mirror of api.ts — same env var, same fallback behavior (mock-first).
 const API_BASE_URL = process.env.TARO_APP_API_BASE_URL ?? '';
@@ -27,11 +28,15 @@ const API_BASE_URL = process.env.TARO_APP_API_BASE_URL ?? '';
  * somewhere. On weapp the call goes to the real wx.login which is intercepted
  * by the @tarojs/plugin-mock sidecar (post feat-037 a real WeChat AppID will
  * be used here).
+ *
+ * Uses `taroFetch` (Taro.request in weapp, native fetch in H5) — Session 033
+ * hit "fetch is not a function" on weapp because the runtime has no native
+ * fetch. taroFetch normalizes both runtimes.
  */
 export async function wechatLoginAndAuth(): Promise<User> {
   const loginResult = await Taro.login();
   const code = loginResult.code;
-  const response = await fetch(`${API_BASE_URL}/auth/wechat-mini`, {
+  const response = await taroFetch(`${API_BASE_URL}/auth/wechat-mini`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code }),
@@ -43,7 +48,7 @@ export async function wechatLoginAndAuth(): Promise<User> {
     }
     throw new Error(body.error ?? `WeChat login failed (${response.status})`);
   }
-  const data: LoginResponse = await response.json();
+  const data = (await response.json()) as LoginResponse;
   setTokens({
     accessToken: data.access_token,
     refreshToken: data.refresh_token,

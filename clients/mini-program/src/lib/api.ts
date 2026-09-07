@@ -1,4 +1,5 @@
 import { getAccessToken } from './tokenStorage';
+import { taroFetch } from './taroFetch';
 
 // TARO_APP_API_BASE_URL falls through to '' in mock-first dev so MSW (H5) /
 // @tarojs/plugin-mock sidecar (weapp) keep intercepting /auth/* and /health.
@@ -15,12 +16,12 @@ const API_BASE_URL = process.env.TARO_APP_API_BASE_URL ?? '';
  *   call POST /auth/refresh, persist new tokens, retry the original request.
  *   For now the error is surfaced to the caller (caller decides UX).
  *
- * Uses the global `fetch` (Taro polyfills it for weapp, native in H5). Kept
+ * Uses `taroFetch` (Taro.request in weapp, native fetch in H5) — kept
  * platform-agnostic on purpose so the same auth flow works in dev (H5) and
  * production (weapp) without branching.
  */
 export interface AuthFetchOptions extends Omit<RequestInit, 'headers'> {
-  headers?: HeadersInit;
+  headers?: Record<string, string>;
   /** Skip attaching the Authorization header (e.g. for /health, /auth/login). */
   skipAuth?: boolean;
 }
@@ -30,15 +31,16 @@ export async function authFetch<T = unknown>(
   options: AuthFetchOptions = {},
 ): Promise<T> {
   const { skipAuth, headers, ...rest } = options;
-  const finalHeaders = new Headers(headers);
+  const finalHeaders: Record<string, string> = { ...(headers ?? {}) };
   if (!skipAuth) {
     const token = getAccessToken();
     if (token !== null) {
-      finalHeaders.set('Authorization', `Bearer ${token}`);
+      finalHeaders['Authorization'] = `Bearer ${token}`;
     }
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await taroFetch(`${API_BASE_URL}${path}`, {
     ...rest,
+    method: rest.method ?? 'GET',
     headers: finalHeaders,
   });
   if (response.status === 401 && !skipAuth) {
