@@ -32,6 +32,7 @@ from backend.app.schemas.agent import (
     ContentShapeError,
     blocks_to_lc_content,
 )
+from backend.app.services.media_resolver import inline_chat_message_media
 
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,10 @@ def _from_langchain(messages: list) -> list[ChatMessage]:
 @router.post("/invoke", response_model=AgentInvokeResponse)
 async def invoke(body: AgentInvokeRequest) -> AgentInvokeResponse:
     """Run a single chat completion against the local Qwen3-VL via LangGraph + vLLM."""
-    lc_messages = _to_langchain(body.messages)
+    # Pre-resolve server-relative image URLs to data URLs (avoids vLLM
+    # self-fetch deadlock while our event loop is blocked by the chat call).
+    resolved_messages = await inline_chat_message_media(body.messages)
+    lc_messages = _to_langchain(resolved_messages)
     agent = get_agent()
 
     try:

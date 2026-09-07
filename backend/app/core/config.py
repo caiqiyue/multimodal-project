@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     media_data_root: str = "data/media"
     media_public_base_url: str = "/api/v1/media"
 
+    # Absolute URL the backend uses to fetch its own server-relative paths
+    # (e.g. /api/v1/media/{id}) from inside async handlers — primarily
+    # used by services.media_resolver to inline image bytes as data:
+    # URLs before handing multi-modal payloads to vLLM. The default points
+    # at localhost because the backend only ever needs to call itself in
+    # the same network namespace; override via BACKEND_PUBLIC_BASE_URL env
+    # if running behind a tunnel or in a container with a different alias.
+    backend_public_base_url: str = "http://127.0.0.1:9000"
+
     # Agent backend mode (feat-027, Session 029).
     # 'demo' — context-aware echo, no vLLM dependency. Use when GPU is busy
     #          or for portfolio demos; client UI still renders coherent text.

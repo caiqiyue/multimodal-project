@@ -30,6 +30,7 @@ from backend.app.schemas.agent import (
     ContentShapeError,
     blocks_to_lc_content,
 )
+from backend.app.services.media_resolver import inline_chat_message_media
 
 
 logger = logging.getLogger(__name__)
@@ -258,7 +259,10 @@ async def ws_chat(ws: WebSocket) -> None:
                 )
                 continue
 
-            lc_messages = _to_langchain(payload.messages)
+            # Pre-resolve server-relative image URLs (avoids vLLM self-fetch
+            # deadlock while the loop is blocked by the chat call).
+            resolved_messages = await inline_chat_message_media(payload.messages)
+            lc_messages = _to_langchain(resolved_messages)
             await _stream_turn(ws, conversation_id, lc_messages)
     except WebSocketDisconnect:
         logger.info("WS chat disconnected conversation_id=%s", conversation_id)
