@@ -5,7 +5,6 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.*;
 import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -51,12 +50,14 @@ class MediaControllerTest {
 
     FilePart filePart = mock(FilePart.class);
     when(filePart.filename()).thenReturn("test.png");
+    when(filePart.headers()).thenReturn(new org.springframework.http.HttpHeaders());
+    filePart.headers().setContentType(MediaType.IMAGE_PNG);
     when(filePart.content()).thenReturn(Flux.just(
         new DefaultDataBufferFactory().allocateBuffer().write("PNG-DATA".getBytes(StandardCharsets.UTF_8))
     ));
 
     @SuppressWarnings("unchecked")
-    Map<String, Object> result = controller.upload(filePart).block();
+    Map<String, Object> result = controller.upload(filePart, "Bearer test-token").block();
     assertNotNull(result);
     assertEquals("m-1", result.get("media_id"));
 
@@ -64,5 +65,9 @@ class MediaControllerTest {
     assertNotNull(recorded);
     assertEquals("POST", recorded.getMethod());
     assertEquals("/api/v1/media/upload", recorded.getPath());
+    assertEquals("Bearer test-token", recorded.getHeader("Authorization"));
+    String body = recorded.getBody().readUtf8();
+    assertTrue(body.contains("filename=\"test.png\""));
+    assertTrue(body.contains("Content-Type: image/png"));
   }
 }
