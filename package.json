@@ -5,6 +5,7 @@
   "description": "Multimodal AI Assistant — frontend MVP (Mac local)",
   "scripts": {
     "dev:mobile": "pnpm --filter mobile-app dev",
+    "dev:web": "pnpm --filter web-app dev",
     "dev:mini": "pnpm --filter mini-program dev:h5",
     "dev:mini:weapp": "pnpm --filter mini-program dev:weapp",
     "typecheck": "pnpm -r typecheck",
