@@ -84,11 +84,19 @@ def create_app() -> FastAPI:
     async def _debug_all_http(request, call_next):
         # DEBUG: log ALL requests to confirm middleware is wired up.
         auth_present = "authorization" in {k.lower() for k in request.headers.keys()}
-        auth_len = len(request.headers.get("authorization", ""))
+        auth_value = request.headers.get("authorization", "")
+        auth_len = len(auth_value)
         header_names = sorted({k for k in request.headers.keys()})
+        # Log fingerprint of auth value (first 8 + last 8 chars) to confirm
+        # it's the right token without leaking it. Session 034.
+        auth_fp = (
+            f"{auth_value[:8]}...{auth_value[-8:]}"
+            if auth_len >= 16
+            else f"<short:{auth_value!r}>"
+        )
         print(
             f"[DEBUG all-http] {request.method} {request.url.path} "
-            f"auth_present={auth_present} auth_len={auth_len} "
+            f"auth_present={auth_present} auth_len={auth_len} auth_fp={auth_fp} "
             f"headers={header_names}",
             flush=True,
         )
