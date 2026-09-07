@@ -28,8 +28,17 @@ from backend.app.services.media_resolver import (
 
 @pytest.fixture(autouse=True)
 def _backend_url(monkeypatch):
-    """Pin backend_public_base_url so relative→absolute conversion is testable."""
+    """Pin backend_public_base_url so relative→absolute conversion is testable.
+
+    ``get_settings()`` is ``@lru_cache``-wrapped — it captures the env at
+    first call, so we have to drop the cache after monkeypatching the var
+    or the resolver will keep seeing the default ``127.0.0.1:9000``.
+    """
     monkeypatch.setenv("BACKEND_PUBLIC_BASE_URL", "http://testserver:9000")
+    from backend.app.core.config import get_settings
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _text_block(s: str) -> TextContentBlock:
