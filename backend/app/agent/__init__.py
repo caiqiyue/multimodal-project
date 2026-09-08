@@ -24,7 +24,12 @@ def get_agent():
     ops can flip ``AGENT_MODE`` env var and restart uvicorn to switch backends
     without code changes.
     """
-    if get_settings().agent_mode == "demo":
+    import os
+    s = get_settings()
+    # DEBUG: Session 035 diagnostic — log every dispatcher call
+    with open('/tmp/dispatch-debug.log', 'a') as f:
+        f.write(f"[DISPATCH] mode={s.agent_mode!r} os_AGENT_MODE={os.environ.get('AGENT_MODE')!r}\n")
+    if s.agent_mode == "demo":
         return EchoAgent()
     return _get_real_agent()
 
