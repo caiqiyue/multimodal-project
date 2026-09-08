@@ -384,9 +384,10 @@ def test_pydantic_accepts_image_url_block_with_detail(client, stub_agent):
     assert r.status_code == 200, r.text
 
 
-def test_pydantic_rejects_video_url_block_in_v1(client):
-    """video_url blocks are V3 (Qwen3-VL supports but OpenAI-compat doesn't).
-    The V1 schema rejects them at the boundary."""
+def test_video_url_block_accepted_in_v3(client, stub_agent):
+    """video_url blocks are V3 (Session 035). Qwen3-VL serves video via vLLM
+    with --limit-mm-per-prompt {"image": 2, "video": 1}. The schema now
+    accepts the block; the real agent forwards it to vLLM."""
     r = client.post(
         "/api/v1/agent/invoke",
         json={
@@ -400,7 +401,9 @@ def test_pydantic_rejects_video_url_block_in_v1(client):
             ],
         },
     )
-    assert r.status_code == 422
+    # Schema accepted (no 422). Real-agent behaviour is exercised by the
+    # live e2e in evidence/feat-168-real-qwen-multimodal.log.
+    assert r.status_code != 422
 
 
 def test_system_message_with_str_content_still_works(client, stub_agent):

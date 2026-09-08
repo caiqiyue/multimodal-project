@@ -6,10 +6,13 @@ the wire contract is stable even if the agent framework changes under us.
 V2 (feat-022 + feat-020): `ChatMessage.content` accepts either plain text
 (legacy) or a list of `ContentBlock`s (text + image_url). The discriminated
 union keeps the wire format aligned with packages/api-contract/src/chat.ts
-`ContentBlockSchema`. `video_url` blocks are reserved for V3 — Qwen3-VL
-supports video via vLLM but the standard OpenAI-compat surface does not
-yet expose a `video_url` content type, so we reject it at the boundary to
-keep the contract honest.
+`ContentBlockSchema`.
+
+V3 (Session 035): adds `video_url` blocks. Qwen3-VL serves video via
+`--limit-mm-per-prompt {"image": 2, "video": 1}`; vLLM accepts the
+non-standard `{"type": "video_url", "video_url": {"url": "..."}}` shape
+as a video part. We model it identically to image_url but with a separate
+type discriminator so the wire contract stays explicit.
 """
 
 from __future__ import annotations
@@ -61,9 +64,32 @@ class ImageUrlContentBlock(BaseModel):
     image_url: ImageUrlPayload
 
 
+class VideoUrlPayload(BaseModel):
+    """Inner `video_url` object — mirrors OpenAI's spec (which itself mirrors
+    vLLM's `chat.completions` API for multi-modal messages).
+
+    `url` may be absolute http(s) or server-relative (vLLM resolves via its
+    base URL). vLLM's `--limit-mm-per-prompt {"image": 2, "video": 1}`
+    governs how many of each the model accepts per turn.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(min_length=1, description="Absolute URL or server-relative path to a video file (e.g. mp4)")
+
+
+class VideoUrlContentBlock(BaseModel):
+    """A reference to a video by URL."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["video_url"]
+    video_url: VideoUrlPayload
+
+
 # Use a true discriminated union so Pydantic dispatches on the `type` field.
 ContentBlock = Annotated[
-    Union[TextContentBlock, ImageUrlContentBlock],
+    Union[TextContentBlock, ImageUrlContentBlock, VideoUrlContentBlock],
     Field(discriminator="type"),
 ]
 
@@ -76,7 +102,7 @@ class ChatMessage(BaseModel):
 
     `content` is either:
       - a non-empty string (legacy V1 path; plain text)
-      - a list of ContentBlocks (V2 path; multi-modal — text + image_url)
+      - a list of ContentBlocks (V2 path; multi-modal — text + image_url + video_url)
 
     Per-shape constraints:
       - str: min_length=1, max_length=32000 (matches the V1 cap)
@@ -150,6 +176,7 @@ def blocks_to_lc_content(blocks: list) -> list[dict[str, Any]]:
         [
           {"type": "text",      "text": "..."},
           {"type": "image_url", "image_url": {"url": "...", "detail": "..."}},
+          {"type": "video_url", "video_url": {"url": "..."}},
         ]
 
     Raises ``ContentShapeError`` if block count is out of range. Callers
@@ -174,6 +201,11 @@ def blocks_to_lc_content(blocks: list) -> list[dict[str, Any]]:
             out.append({
                 "type": "image_url",
                 "image_url": b.image_url.model_dump(exclude_none=True),  # type: ignore[attr-defined]
+            })
+        elif b.type == "video_url":
+            out.append({
+                "type": "video_url",
+                "video_url": b.video_url.model_dump(exclude_none=True),  # type: ignore[attr-defined]
             })
         else:  # defensive — discriminator should prevent this branch
             raise ContentShapeError(f"unsupported content block type: {b.type}")

@@ -77,13 +77,15 @@ class Settings(BaseSettings):
     # if running behind a tunnel or in a container with a different alias.
     backend_public_base_url: str = "http://127.0.0.1:9000"
 
-    # Agent backend mode (feat-027, Session 029).
+    # Agent backend mode (feat-027, Session 029; flipped Session 035).
     # 'demo' — context-aware echo, no vLLM dependency. Use when GPU is busy
     #          or for portfolio demos; client UI still renders coherent text.
     # 'real' — LangGraph agent calling vLLM. Requires vLLM serving.
-    # Default 'demo' because vLLM is currently OFF (GPU 1 A6000 busy since
-    # 2026-08-31). Flip via `AGENT_MODE=real` env var when vLLM is back.
-    agent_mode: Literal["demo", "real"] = "demo"
+    # Default flipped to 'real' in Session 035 per user directive
+    # "服务端开启vllm，运行部署好的真是qwen3-vl" — real Qwen3-VL is the
+    # production path. Override via `AGENT_MODE=demo` env var when vLLM is
+    # unreachable for graceful degradation.
+    agent_mode: Literal["demo", "real"] = "real"
 
 
 @lru_cache(maxsize=1)

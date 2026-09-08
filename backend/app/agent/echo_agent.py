@@ -68,20 +68,21 @@ def _get_role(m: Any) -> str | None:
     return None
 
 
-def _extract_text_and_image_counts(content: Any) -> tuple[list[str], int]:
-    """Pull text snippets + image_url count from either ChatMessage.content
-    (str | list[ContentBlock]) or LangChain HumanMessage.content
+def _extract_text_and_image_counts(content: Any) -> tuple[list[str], int, int]:
+    """Pull text snippets + image_url count + video_url count from either
+    ChatMessage.content (str | list[ContentBlock]) or LangChain HumanMessage.content
     (str | list[dict]).
 
-    Returns ``(text_parts, image_count)``.
+    Returns ``(text_parts, image_count, video_count)``.
     """
     if isinstance(content, str):
-        return ([content] if content else []), 0
+        return ([content] if content else []), 0, 0
     if not isinstance(content, list):
-        return [], 0
+        return [], 0, 0
 
     text_parts: list[str] = []
     image_count = 0
+    video_count = 0
     for item in content:
         # ContentBlock (Pydantic) — attribute access
         # dict (LangChain multi-modal) — key access
@@ -91,14 +92,18 @@ def _extract_text_and_image_counts(content: Any) -> tuple[list[str], int]:
                 text_parts.append(item.get("text", ""))
             elif item_type == "image_url":
                 image_count += 1
+            elif item_type == "video_url":
+                video_count += 1
         else:
             item_type = getattr(item, "type", None)
             if item_type == "text":
                 text_parts.append(getattr(item, "text", ""))
             elif item_type == "image_url":
                 image_count += 1
+            elif item_type == "video_url":
+                video_count += 1
             # unknown block type — skip (matches real LangChain tolerance)
-    return text_parts, image_count
+    return text_parts, image_count, video_count
 
 
 def _build_reply_text(messages: list[Any]) -> str:
@@ -110,8 +115,8 @@ def _build_reply_text(messages: list[Any]) -> str:
       - LangChain HumanMessage / AIMessage / SystemMessage (what the real
         routers pass after ``_to_langchain`` has coerced the wire format)
 
-    Handles both V1 ``content: str`` and V2 ``content: list[ContentBlock]``
-    shapes (feat-026 widening, Session 028).
+    Handles V1 ``content: str`` + V2 ``content: list[ContentBlock]`` shapes
+    (text + image_url + video_url).
     """
     last_user = next(
         (m for m in reversed(messages) if _get_role(m) == "user"), None
@@ -119,13 +124,21 @@ def _build_reply_text(messages: list[Any]) -> str:
     if last_user is None:
         return f"{DEMO_PREFIX}消息（无可回应的用户轮次））"
 
-    text_parts, image_count = _extract_text_and_image_counts(last_user.content)
+    text_parts, image_count, video_count = _extract_text_and_image_counts(last_user.content)
     text_summary = text_parts[0][:TEXT_SNIPPET_CAP] if text_parts else ""
 
-    if image_count and text_summary:
-        return f"{DEMO_PREFIX}{image_count} 张图片和文字：{text_summary}）"
+    media_count = image_count + video_count
+    media_parts: list[str] = []
     if image_count:
-        return f"{DEMO_PREFIX}{image_count} 张图片）"
+        media_parts.append(f"{image_count} 张图片")
+    if video_count:
+        media_parts.append(f"{video_count} 个视频")
+    media_summary = "、".join(media_parts)
+
+    if media_count and text_summary:
+        return f"{DEMO_PREFIX}{media_summary}和文字：{text_summary}）"
+    if media_count:
+        return f"{DEMO_PREFIX}{media_summary}）"
     if text_summary:
         return f"{DEMO_PREFIX}文字消息：{text_summary}）"
     return f"{DEMO_PREFIX}空内容消息）"

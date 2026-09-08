@@ -38,10 +38,11 @@ async def lifespan(app: FastAPI):
     """Log startup/shutdown banners. Real services (DB, vLLM, agent) attach later."""
     settings = get_settings()
     logger.info(
-        "Starting multimodal-backend env=%s host=%s port=%d",
+        "Starting multimodal-backend env=%s host=%s port=%d agent_mode=%s",
         settings.environment,
         settings.host,
         settings.port,
+        settings.agent_mode,
     )
     yield
     logger.info("Stopping multimodal-backend")
