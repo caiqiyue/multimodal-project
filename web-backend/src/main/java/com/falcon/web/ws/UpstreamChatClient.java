@@ -43,7 +43,15 @@ public class UpstreamChatClient {
   }
 
   public Mono<Void> connect() {
-    WebSocketHandler handler = new WebSocketHandler() {
+    log.info("UpstreamChatClient connecting to upstream url={}", upstreamUrl);
+    // Session 035 diagnostic — surface any connect failure clearly
+    return client.execute(URI.create(upstreamUrl), buildHandler())
+        .doOnError(err -> log.warn("UpstreamChatClient connect to {} failed: {}", upstreamUrl, err.toString()))
+        .doOnSuccess(v -> log.info("UpstreamChatClient upstream connected url={}", upstreamUrl));
+  }
+
+  private WebSocketHandler buildHandler() {
+    return new WebSocketHandler() {
       @Override
       public Mono<Void> handle(WebSocketSession upstream) {
         upstreamSession.set(upstream);
@@ -70,7 +78,6 @@ public class UpstreamChatClient {
         return Mono.first(upstreamToVue, vueToUpstream);
       }
     };
-    return client.execute(URI.create(upstreamUrl), handler);
   }
 
   /**
