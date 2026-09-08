@@ -3,7 +3,19 @@ import { getAccessToken } from './tokenStorage';
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 export interface AuthFetchOptions extends Omit<RequestInit, 'headers'> {
-  headers?: HeadersInit;
+  /**
+   * Request headers as a plain `Record<string, string>` (NOT `HeadersInit`).
+   *
+   * The previous shape `HeadersInit` was passed to RN's native fetch as
+   * `new Headers(headers)`, but RN's Headers polyfill drops entries under
+   * some conditions (observed on iOS multipart uploads — the
+   * `Authorization` header was being silently stripped from FormData POSTs,
+   * causing 401s). Using a plain object sidesteps the polyfill entirely.
+   *
+   * For multipart uploads, pass `headers: {}` and let RN/fetch set the
+   * `Content-Type: multipart/form-data; boundary=...` header itself.
+   */
+  headers?: Record<string, string>;
   /** Skip attaching the Authorization header (e.g. for /health, /auth/login). */
   skipAuth?: boolean;
 }
@@ -22,11 +34,11 @@ export async function authFetch<T = unknown>(
   options: AuthFetchOptions = {},
 ): Promise<T> {
   const { skipAuth, headers, ...rest } = options;
-  const finalHeaders = new Headers(headers);
+  const finalHeaders: Record<string, string> = { ...(headers ?? {}) };
   if (!skipAuth) {
     const token = await getAccessToken();
     if (token !== null && token.length > 0) {
-      finalHeaders.set('Authorization', `Bearer ${token}`);
+      finalHeaders['Authorization'] = `Bearer ${token}`;
     }
   }
   const response = await fetch(`${API_BASE_URL}${path}`, {

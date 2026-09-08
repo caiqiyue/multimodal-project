@@ -4,6 +4,7 @@ import type { User } from '@multimodal/api-contract/auth';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { ChatScreen } from './src/screens/ChatScreen';
 import { logout } from './src/lib/auth';
+import { authFetch } from './src/lib/api';
 import {
   clearTokens,
   getAccessToken,
@@ -41,8 +42,8 @@ export default function App() {
 
   // Restore session: read stored token + user once MSW is up.
   // If only the token survived (older session / partial write), drop it and
-  // start at anonymous. Once feat-026 backend lands, this is the spot to
-  // re-validate the token via GET /me instead of trusting the stored user.
+  // start at anonymous. Real-backend mode re-validates via GET /me so an
+  // expired simulator SecureStore token cannot produce upload-time 401s.
   useEffect(() => {
     if (!mockingEnabled) return;
     let cancelled = false;
@@ -56,6 +57,18 @@ export default function App() {
       const user = await getCurrentUser();
       if (cancelled) return;
       if (user !== null) {
+        if ((process.env.EXPO_PUBLIC_API_BASE_URL ?? '').length > 0) {
+          try {
+            const freshUser = await authFetch<User>('/me');
+            if (cancelled) return;
+            setAuthState({ status: 'authenticated', user: freshUser });
+            return;
+          } catch {
+            await clearTokens();
+            if (!cancelled) setAuthState({ status: 'anonymous' });
+            return;
+          }
+        }
         setAuthState({ status: 'authenticated', user });
       } else {
         await clearTokens();

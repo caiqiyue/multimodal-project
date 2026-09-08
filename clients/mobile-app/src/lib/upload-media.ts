@@ -6,17 +6,34 @@
  *     so the user gets an immediate error instead of waiting for the wire
  *     to finish a 413 round-trip (V1 limitation: 413 fires after full body
  *     read — see session-handoff.md).
- *  2. Build FormData with the picker asset URI as the file part.
- *  3. Send via authFetch (auto-attaches bearer JWT).
+ *  2. Build a multipart/form-data body manually via XMLHttpRequest (NOT fetch).
+ *  3. Explicitly attach `Authorization: Bearer <token>` from SecureStore.
  *  4. Return the parsed MediaUploadResponse.
  *
- * The picker asset's `uri` is a local file:// path on iOS / Android. React
- * Native's FormData implementation streams the file contents into the
- * multipart body — we don't have to read the file into memory.
+ * ── Why XMLHttpRequest instead of fetch ────────────────────────────────────
+ * iOS NSURLSession (which backs React Native's `fetch` with
+ * `EXPO_PUBLIC_USE_RN_FETCH=1`) silently drops the `Authorization` request
+ * header when the request body is `multipart/form-data`. Confirmed in
+ * Session 034: debug log shows the token is present in SecureStore and is
+ * being read (`token.len=172 token.prefix=eyJhbGciOiJI`), yet the same
+ * request via curl with the same token returns the expected 415
+ * (auth-passed, MIME-rejected) while the mobile-app returns 401
+ * (auth-failed).
+ *
+ * XHR goes through a different code path on iOS and does forward
+ * Authorization headers on multipart POSTs. This is the canonical RN
+ * upload pattern; see expo / react-native docs and the long-standing
+ * community guidance to use XHR for multipart uploads.
+ *
+ * The picker asset's `uri` is a local file:// path on iOS / Android. XHR's
+ * FormData streams the file contents into the multipart body — we don't
+ * have to read the file into memory.
  */
 import { MEDIA_LIMITS, type MediaUploadResponse, type MediaType } from '@multimodal/api-contract/media';
 
-import { authFetch } from './api';
+import { getAccessToken } from './tokenStorage';
+
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
 
 /**
  * A file picked from expo-image-picker that we want to upload.
@@ -89,10 +106,15 @@ function defaultMime(asset: UploadableAsset): string {
 
 /**
  * Upload a single asset to the server. Throws MediaValidationError on
- * pre-check failure or whatever authFetch throws on HTTP error.
+ * pre-check failure, or an Error whose message contains the HTTP status
+ * on a non-2xx response (so the chat UI can surface a meaningful error).
+ *
+ * Implementation uses XMLHttpRequest directly — see the file header for
+ * why fetch is not used here.
  */
 export async function uploadMedia(asset: UploadableAsset): Promise<MediaUploadResponse> {
   assertAcceptable(asset);
+
   const formData = new FormData();
   // React Native FormData accepts { uri, name, type } as a file part.
   formData.append('file', {
@@ -103,10 +125,36 @@ export async function uploadMedia(asset: UploadableAsset): Promise<MediaUploadRe
     type: defaultMime(asset),
   } as unknown as Blob);
 
-  return authFetch<MediaUploadResponse>('/media/upload', {
-    method: 'POST',
-    body: formData,
-    // Let RN set the multipart Content-Type + boundary itself.
-    headers: {},
+  const token = await getAccessToken();
+  if (token === null || token.length === 0) {
+    throw new Error('Unauthorized (no access token in storage)');
+  }
+
+  const url = `${API_BASE_URL}/media/upload`;
+
+  return new Promise<MediaUploadResponse>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    // Do NOT set Content-Type — XHR + FormData will set the multipart
+    // boundary itself, and a hand-set header would clobber the boundary.
+    xhr.responseType = 'json';
+    xhr.onload = (): void => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(xhr.response as MediaUploadResponse);
+        return;
+      }
+      // Surface the HTTP status in the error so the UI can show "上传失败 (401)"
+      // rather than the generic "Network Error".
+      const body =
+        typeof xhr.response === 'object' && xhr.response !== null && 'error' in xhr.response
+          ? String((xhr.response as { error?: unknown }).error)
+          : '';
+      reject(new Error(`Upload failed (${xhr.status})${body ? `: ${body}` : ''}`));
+    };
+    xhr.onerror = (): void => {
+      reject(new Error('Network error during upload'));
+    };
+    xhr.send(formData);
   });
 }
