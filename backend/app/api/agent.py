@@ -30,6 +30,11 @@ from backend.app.schemas.agent import (
     AgentInvokeResponse,
     ChatMessage,
     ContentShapeError,
+    ImageUrlContentBlock,
+    ImageUrlPayload,
+    TextContentBlock,
+    VideoUrlContentBlock,
+    VideoUrlPayload,
     blocks_to_lc_content,
 )
 from backend.app.services.media_resolver import inline_chat_message_media
@@ -80,6 +85,12 @@ def _from_langchain(messages: list) -> list[ChatMessage]:
       call a tool" intermediate; the actual final answer follows in a later
       AIMessage.
 
+    Handles V1 (str content) and V2/V3 (list[ContentBlock] content) shapes.
+    For multi-modal assistant replies (list of dicts from LangChain), we
+    promote to ChatMessage content as a list[ContentBlock] preserving
+    image_url / video_url / text parts — this avoids the 32K char limit
+    that a stringified list would hit.
+
     If we forwarded these, the Pydantic `min_length=1` constraint on
     `ChatMessage.content` would 422 (and there's no chat role for "tool").
     """
@@ -89,7 +100,9 @@ def _from_langchain(messages: list) -> list[ChatMessage]:
             role, content = "user", m.content
         elif isinstance(m, AIMessage):
             # Drop intermediate tool-call AIMessages (content="" + tool_calls=[...]).
-            if getattr(m, "tool_calls", None) and not (isinstance(m.content, str) and m.content):
+            if getattr(m, "tool_calls", None) and not (
+                isinstance(m.content, (str, list)) and m.content
+            ):
                 continue
             role, content = "assistant", m.content
         elif isinstance(m, SystemMessage):
@@ -100,7 +113,38 @@ def _from_langchain(messages: list) -> list[ChatMessage]:
         else:
             # Unknown message type — skip rather than coerce to a misleading role.
             continue
-        if not isinstance(content, str):
+        # Normalize content:
+        #   - str       -> keep as str (V1 path)
+        #   - list      -> convert to list[ContentBlock] (V2/V3 multi-modal path)
+        #   - anything else -> str() coercion (best effort)
+        if isinstance(content, str):
+            pass  # V1 path
+        elif isinstance(content, list):
+            # Convert list of dicts (LangChain multi-modal) to ContentBlock list
+            blocks: list[ContentBlock] = []
+            for part in content:
+                if not isinstance(part, dict):
+                    continue
+                ptype = part.get("type")
+                if ptype == "text" and part.get("text"):
+                    blocks.append(TextContentBlock(type="text", text=part["text"]))
+                elif ptype == "image_url" and part.get("image_url", {}).get("url"):
+                    blocks.append(ImageUrlContentBlock(
+                        type="image_url",
+                        image_url=ImageUrlPayload(**part["image_url"])))
+                elif ptype == "video_url" and part.get("video_url", {}).get("url"):
+                    blocks.append(VideoUrlContentBlock(
+                        type="video_url",
+                        video_url=VideoUrlPayload(**part["video_url"])))
+                else:
+                    # Unknown block type — skip (matches _to_langchain tolerance)
+                    continue
+            if blocks:
+                out.append(ChatMessage(role=role, content=blocks))
+                continue
+            # Empty list (no recognizable blocks) — fall through to empty-check
+            content = ""
+        else:
             content = str(content)
         if not content:  # belt-and-braces — should already be filtered above
             continue
