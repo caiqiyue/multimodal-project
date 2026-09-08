@@ -78,9 +78,6 @@ def _call_llm(state: AgentState) -> dict[str, list[BaseMessage]]:
     """
     llm = _build_llm()
     response = llm.invoke(state["messages"])
-    # DEBUG Session 035 — log vLLM response shape
-    with open('/tmp/llm-call-debug.log', 'a') as f:
-        f.write(f"[LLM] type={type(response).__name__} content={repr(response.content)[:300]} tool_calls={getattr(response, 'tool_calls', None)}\n")
     return {"messages": [response]}
 
 

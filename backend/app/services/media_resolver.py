@@ -1,9 +1,9 @@
-"""Async resolver that inlines server-relative image URLs as data URLs.
+"""Async resolver that inlines server-relative image/video URLs as data URLs.
 
 Why this exists
 ---------------
-vLLM needs to fetch image URLs itself when handling multi-modal chat
-completions. Our chat-completion request is synchronous from FastAPI's
+vLLM needs to fetch image / video URLs itself when handling multi-modal
+chat completions. Our chat-completion request is synchronous from FastAPI's
 perspective — it blocks the event loop until vLLM finishes streaming the
 full reply. If we hand vLLM a server-relative URL like
 ``/api/v1/media/{id}``, vLLM issues an HTTP fetch against our own backend,
@@ -12,9 +12,10 @@ during Phase 0 vLLM-on e2e: vLLM logs ``HTTP fetch failed ... timeout=5s,
 20s, 80s`` before erroring out, and the client times out at 60s).
 
 The fix is to fetch the bytes ourselves in an async context, then inline
-as ``data:image/...;base64,...`` so vLLM doesn't need to do any further
-HTTP work. External URLs (different host) are returned unchanged —
-vLLM can fetch those directly because they're not on our event loop.
+as ``data:image/...;base64,...`` (or ``data:video/...;base64,...``) so vLLM
+doesn't need to do any further HTTP work. External URLs (different host)
+are returned unchanged — vLLM can fetch those directly because they're not
+on our event loop.
 """
 from __future__ import annotations
 
@@ -28,27 +29,33 @@ from backend.app.schemas.agent import (
     ChatMessage,
     ImageUrlContentBlock,
     ImageUrlPayload,
+    VideoUrlContentBlock,
+    VideoUrlPayload,
 )
 
 
 logger = logging.getLogger(__name__)
 
 
-async def _inline_one_url(url: str, base: str) -> str | None:
+async def _inline_one_url(url: str, base: str) -> tuple[str | None, str | None]:
     """Fetch a server-relative or same-origin absolute URL and base64-inline it.
 
-    Returns ``None`` if the URL is external (different origin) or the fetch
-    fails. Callers pass the original block through in those cases — better
-    to let vLLM try (and fail cleanly) than 422 the user.
+    Returns ``(data_url, content_type)``:
+      - ``(None, None)`` if the URL is external (different origin) or the
+        fetch fails.
+      - ``(data_url, content_type)`` on success.
+
+    Callers pass the original block through on (None, None) — better to let
+    vLLM try (and fail cleanly) than 422 the user.
     """
     if url.startswith(("http://", "https://")):
         if not url.startswith(base):
-            return None  # external — vLLM can fetch directly
+            return (None, None)  # external — vLLM can fetch directly
         fetch_url = url
     elif url.startswith("/"):
         fetch_url = base + url
     else:
-        return None  # unknown scheme — leave alone
+        return (None, None)  # unknown scheme — leave alone
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -57,12 +64,12 @@ async def _inline_one_url(url: str, base: str) -> str | None:
             ctype_raw = resp.headers.get("content-type", "image/jpeg")
             ctype = ctype_raw.split(";", 1)[0].strip() or "image/jpeg"
             b64 = base64.b64encode(resp.content).decode("ascii")
-        return f"data:{ctype};base64,{b64}"
+        return (f"data:{ctype};base64,{b64}", ctype)
     except Exception as exc:  # noqa: BLE001 — best-effort resolver
         logger.warning(
             "media_resolver: fetch %s failed (%s); passing through", fetch_url, exc
         )
-        return None
+        return (None, None)
 
 
 async def inline_image_urls(blocks: list) -> list:
@@ -80,11 +87,33 @@ async def inline_image_urls(blocks: list) -> list:
         if not isinstance(b, ImageUrlContentBlock):
             out.append(b)
             continue
-        data_url = await _inline_one_url(b.image_url.url, base)
+        data_url, _ctype = await _inline_one_url(b.image_url.url, base)
         if data_url is None:
             out.append(b)
         else:
             out.append(b.model_copy(update={"image_url": ImageUrlPayload(url=data_url)}))
+    return out
+
+
+async def inline_video_urls(blocks: list) -> list:
+    """Async-fetch server-relative video_url blocks and inline as data URLs.
+
+    Mirrors inline_image_urls for VideoUrlContentBlock (V3 widening of
+    feat-022). vLLM accepts ``data:video/mp4;base64,...`` for multi-modal
+    video parts.
+    """
+    settings = get_settings()
+    base = settings.backend_public_base_url.rstrip("/")
+    out: list = []
+    for b in blocks:
+        if not isinstance(b, VideoUrlContentBlock):
+            out.append(b)
+            continue
+        data_url, _ctype = await _inline_one_url(b.video_url.url, base)
+        if data_url is None:
+            out.append(b)
+        else:
+            out.append(b.model_copy(update={"video_url": VideoUrlPayload(url=data_url)}))
     return out
 
 
@@ -94,6 +123,8 @@ async def inline_chat_message_media(messages: list[ChatMessage]) -> list[ChatMes
     str-content messages pass through unchanged. Returns a new list of
     ChatMessage instances (input not mutated) so the caller can pass the
     resolved copy to the agent without losing the original wire shape.
+
+    Resolves both ``image_url`` (V2) and ``video_url`` (V3) blocks.
     """
     out: list[ChatMessage] = []
     for m in messages:
@@ -101,5 +132,6 @@ async def inline_chat_message_media(messages: list[ChatMessage]) -> list[ChatMes
             out.append(m)
             continue
         new_blocks = await inline_image_urls(m.content)
+        new_blocks = await inline_video_urls(new_blocks)
         out.append(m.model_copy(update={"content": new_blocks}))
     return out
