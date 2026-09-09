@@ -53,6 +53,19 @@
       <version>4.1.118.Final</version>
       <classifier>osx-aarch_64</classifier>
     </dependency>
+    <!--
+      Session 035 fix v2: OkHttp WebSocket as a more reliable alternative
+      to JDK java.net.http.WebSocket. The JDK WS client has a bug where it
+      stops delivering frames after the first text message whose
+      CompletionStage completes (even with keep-receiving pattern, it
+      stops at frame 1). OkHttp is battle-tested on Mac and follows the
+      WS protocol more strictly.
+    -->
+    <dependency>
+      <groupId>com.squareup.okhttp3</groupId>
+      <artifactId>okhttp</artifactId>
+      <version>4.12.0</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
