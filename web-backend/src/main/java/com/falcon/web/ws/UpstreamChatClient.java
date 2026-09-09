@@ -49,9 +49,12 @@ public class UpstreamChatClient {
           @Override
           public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
             // Pump A: upstream -> Vue
+            // Use subscribe() not .toFuture() — the Mono from vueSession.send
+            // doesn't always await cleanly via toFuture, leaving the listener
+            // hanging and subsequent frames blocked.
             String text = data.toString();
-            return vueSession.send(Mono.just(vueSession.textMessage(text)))
-                .toFuture();
+            vueSession.send(Mono.just(vueSession.textMessage(text))).subscribe();
+            return null;
           }
 
           @Override
